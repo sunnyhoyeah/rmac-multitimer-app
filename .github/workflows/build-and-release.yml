@@ -1,0 +1,196 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      version_bump:
+        description: 'Version bump type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+jobs:
+  version-and-build:
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.24.0'
+        channel: 'stable'
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Install dependencies
+      run: |
+        npm install -g standard-version
+        flutter pub get
+
+    - name: Run tests
+      run: flutter test
+
+    - name: Auto-bump version (on main branch push)
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        
+        # Get current version from pubspec.yaml
+        CURRENT_VERSION=$(grep '^version:' pubspec.yaml | cut -d' ' -f2 | cut -d'+' -f1)
+        echo "Current version: $CURRENT_VERSION"
+        
+        # Auto-increment patch version
+        IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
+        MAJOR=${VERSION_PARTS[0]}
+        MINOR=${VERSION_PARTS[1]}
+        PATCH=${VERSION_PARTS[2]}
+        NEW_PATCH=$((PATCH + 1))
+        NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
+        
+        # Get current build number and increment
+        CURRENT_BUILD=$(grep '^version:' pubspec.yaml | cut -d'+' -f2)
+        NEW_BUILD=$((CURRENT_BUILD + 1))
+        
+        # Update pubspec.yaml
+        sed -i '' "s/^version:.*/version: $NEW_VERSION+$NEW_BUILD/" pubspec.yaml
+        
+        echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+        echo "NEW_BUILD=$NEW_BUILD" >> $GITHUB_ENV
+
+    - name: Manual version bump (on workflow dispatch)
+      if: github.event_name == 'workflow_dispatch'
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        
+        CURRENT_VERSION=$(grep '^version:' pubspec.yaml | cut -d' ' -f2 | cut -d'+' -f1)
+        IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
+        MAJOR=${VERSION_PARTS[0]}
+        MINOR=${VERSION_PARTS[1]}
+        PATCH=${VERSION_PARTS[2]}
+        
+        case "${{ github.event.inputs.version_bump }}" in
+          "major")
+            NEW_VERSION="$((MAJOR + 1)).0.0"
+            ;;
+          "minor")
+            NEW_VERSION="$MAJOR.$((MINOR + 1)).0"
+            ;;
+          "patch")
+            NEW_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
+            ;;
+        esac
+        
+        CURRENT_BUILD=$(grep '^version:' pubspec.yaml | cut -d'+' -f2)
+        NEW_BUILD=$((CURRENT_BUILD + 1))
+        
+        sed -i '' "s/^version:.*/version: $NEW_VERSION+$NEW_BUILD/" pubspec.yaml
+        
+        echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+        echo "NEW_BUILD=$NEW_BUILD" >> $GITHUB_ENV
+
+    - name: Build iOS (Release)
+      if: github.ref == 'refs/heads/main'
+      run: |
+        flutter build ios --release --no-codesign
+      
+    - name: Build Android APK
+      if: github.ref == 'refs/heads/main'
+      run: |
+        flutter build apk --release
+
+    - name: Build Android App Bundle
+      if: github.ref == 'refs/heads/main'
+      run: |
+        flutter build appbundle --release
+
+    - name: Commit version bump
+      if: github.ref == 'refs/heads/main' && (env.NEW_VERSION != '')
+      run: |
+        git add pubspec.yaml
+        git commit -m "chore: bump version to ${{ env.NEW_VERSION }}+${{ env.NEW_BUILD }}" || exit 0
+        git push origin main
+
+    - name: Create Release
+      if: github.ref == 'refs/heads/main' && (env.NEW_VERSION != '')
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ env.NEW_VERSION }}
+        release_name: Release v${{ env.NEW_VERSION }}
+        body: |
+          ## Changes in v${{ env.NEW_VERSION }}
+          
+          - Auto-generated release from commit ${{ github.sha }}
+          - Build number: ${{ env.NEW_BUILD }}
+          
+          ### Downloads
+          - Android APK: Available in the artifacts below
+          - iOS IPA: Available in the artifacts below (requires signing)
+        draft: false
+        prerelease: false
+
+    - name: Upload Android APK
+      if: github.ref == 'refs/heads/main'
+      uses: actions/upload-artifact@v4
+      with:
+        name: android-apk-v${{ env.NEW_VERSION || 'dev' }}
+        path: build/app/outputs/flutter-apk/app-release.apk
+
+    - name: Upload Android App Bundle
+      if: github.ref == 'refs/heads/main'
+      uses: actions/upload-artifact@v4
+      with:
+        name: android-aab-v${{ env.NEW_VERSION || 'dev' }}
+        path: build/app/outputs/bundle/release/app-release.aab
+
+    - name: Upload iOS Build
+      if: github.ref == 'refs/heads/main'
+      uses: actions/upload-artifact@v4
+      with:
+        name: ios-build-v${{ env.NEW_VERSION || 'dev' }}
+        path: build/ios/iphoneos/Runner.app
+
+  analyze-and-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.24.0'
+        channel: 'stable'
+
+    - name: Install dependencies
+      run: flutter pub get
+
+    - name: Verify formatting
+      run: dart format --output=none --set-exit-if-changed .
+
+    - name: Analyze project source
+      run: dart analyze
+
+    - name: Run tests
+      run: flutter test
