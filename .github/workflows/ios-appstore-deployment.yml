@@ -1,0 +1,130 @@
+name: iOS App Store Deployment
+
+on:
+  push:
+    tags:
+      - 'v*'  # Triggers on version tags like v1.0.0
+  workflow_dispatch:
+    inputs:
+      deployment_type:
+        description: 'Deployment type'
+        required: true
+        default: 'testflight'
+        type: choice
+        options:
+          - testflight
+          - appstore
+      release_notes:
+        description: 'Release notes'
+        required: false
+        default: 'Automated release'
+
+env:
+  FLUTTER_VERSION: '3.24.0'
+
+jobs:
+  deploy-ios:
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: ${{ env.FLUTTER_VERSION }}
+        channel: 'stable'
+
+    - name: Setup Ruby for Fastlane
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: '3.0'
+        bundler-cache: true
+        working-directory: ios
+
+    - name: Cache Flutter dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.pub-cache
+          **/.flutter-plugins
+          **/.flutter-plugin-dependencies
+          **/GeneratedPluginRegistrant.swift
+        key: flutter-${{ runner.os }}-${{ hashFiles('**/pubspec.yaml') }}
+
+    - name: Install Flutter dependencies
+      run: flutter pub get
+
+    - name: Setup iOS certificates and provisioning profiles
+      env:
+        # Add these secrets to your GitHub repository
+        MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+        MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+        FASTLANE_USER: ${{ secrets.FASTLANE_USER }}
+        FASTLANE_PASSWORD: ${{ secrets.FASTLANE_PASSWORD }}
+        APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+        APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+      working-directory: ios
+      run: |
+        # Create API key file
+        echo "$APP_STORE_CONNECT_API_KEY" | base64 --decode > AuthKey_$APP_STORE_CONNECT_API_KEY_ID.p8
+        
+        # Install certificates and provisioning profiles
+        bundle exec fastlane match appstore --readonly
+        bundle exec fastlane match development --readonly
+
+    - name: Build iOS release
+      run: |
+        flutter build ios --release --no-codesign
+        cd ios
+        bundle exec fastlane build_app
+
+    - name: Deploy to TestFlight
+      if: github.event.inputs.deployment_type == 'testflight' || github.event_name == 'push'
+      env:
+        FASTLANE_USER: ${{ secrets.FASTLANE_USER }}
+        FASTLANE_PASSWORD: ${{ secrets.FASTLANE_PASSWORD }}
+        APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+        APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      working-directory: ios
+      run: |
+        bundle exec fastlane upload_to_testflight \
+          changelog:"${{ github.event.inputs.release_notes || 'Automated release from GitHub Actions' }}" \
+          skip_waiting_for_build_processing:true
+
+    - name: Deploy to App Store
+      if: github.event.inputs.deployment_type == 'appstore'
+      env:
+        FASTLANE_USER: ${{ secrets.FASTLANE_USER }}
+        FASTLANE_PASSWORD: ${{ secrets.FASTLANE_PASSWORD }}
+        APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+        APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      working-directory: ios
+      run: |
+        bundle exec fastlane upload_to_app_store \
+          submit_for_review:true \
+          automatic_release:false \
+          force:true \
+          submission_information:"{\"add_id_info_limits_tracking\": true, \"add_id_info_serves_ads\": false, \"add_id_info_tracks_action\": true, \"add_id_info_tracks_install\": true, \"add_id_info_uses_idfa\": false, \"content_rights_has_rights\": true, \"content_rights_contains_third_party_content\": false}" \
+          release_notes:"${{ github.event.inputs.release_notes || 'Automated release from GitHub Actions' }}"
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ios-ipa-${{ github.run_number }}
+        path: ios/build/Runner.ipa
+
+    - name: Notify deployment status
+      if: always()
+      run: |
+        if [ "${{ job.status }}" == "success" ]; then
+          echo "✅ iOS deployment completed successfully!"
+          echo "🚀 Check TestFlight or App Store Connect for the new build"
+        else
+          echo "❌ iOS deployment failed!"
+          echo "💡 Check the logs above for error details"
+        fi

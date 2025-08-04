@@ -1,5 +1,5 @@
 # RMAC MultiTimer - Development Commands
-.PHONY: help setup clean test build-ios build-android build-all version-patch version-minor version-major release
+.PHONY: help setup clean test build-ios build-android build-all version-patch version-minor version-major release iphone-list iphone-install iphone-test
 
 # Default target
 help:
@@ -18,6 +18,12 @@ help:
 	@echo "  make build-all       - Build both iOS and Android"
 	@echo "  make build-debug     - Build debug versions"
 	@echo ""
+	@echo "📱 iPhone device commands:"
+	@echo "  make iphone-list     - List connected iPhones"
+	@echo "  make iphone-install  - Install app to connected iPhone"
+	@echo "  make iphone-test     - Run integration tests on iPhone"
+	@echo "  make iphone-deploy   - Deploy to TestFlight (guidance)"
+	@echo ""
 	@echo "📦 Version management:"
 	@echo "  make version-patch   - Bump patch version (1.0.0 -> 1.0.1)"
 	@echo "  make version-minor   - Bump minor version (1.0.0 -> 1.1.0)"
@@ -27,6 +33,12 @@ help:
 	@echo "  make release-patch   - Bump patch version and create release"
 	@echo "  make release-minor   - Bump minor version and create release"
 	@echo "  make release-major   - Bump major version and create release"
+	@echo ""
+	@echo "📱 App Store Connect:"
+	@echo "  make deploy-testflight  - Deploy to TestFlight"
+	@echo "  make deploy-appstore    - Deploy to App Store"
+	@echo "  make setup-fastlane     - Setup Fastlane dependencies"
+	@echo "  make ios-certificates   - Setup iOS certificates"
 
 # Setup development environment
 setup:
@@ -138,3 +150,57 @@ generate:
 	@echo "⚙️  Generating build files..."
 	flutter pub run build_runner build --delete-conflicting-outputs
 	@echo "✅ Generation complete!"
+
+# App Store Connect deployment
+deploy-testflight:
+	@echo "🛫 Deploying to TestFlight..."
+	./scripts/appstore_deploy.sh testflight "Automated TestFlight release"
+
+deploy-appstore:
+	@echo "🏪 Deploying to App Store..."
+	./scripts/appstore_deploy.sh appstore "New release with latest features"
+
+# iOS-specific setup
+setup-fastlane:
+	@echo "💎 Setting up Fastlane..."
+	cd ios && bundle install
+	@echo "✅ Fastlane setup complete!"
+
+ios-certificates:
+	@echo "📱 Setting up iOS certificates..."
+	cd ios && bundle exec fastlane certificates
+	@echo "✅ iOS certificates setup complete!"
+
+# iPhone device management
+iphone-list:
+	@echo "📱 Listing connected iPhones..."
+	./scripts/iphone_connect.sh list
+
+iphone-install:
+	@echo "📲 Installing app to iPhone..."
+	./scripts/iphone_connect.sh install
+
+iphone-test:
+	@echo "🧪 Testing app on iPhone..."
+	./scripts/iphone_connect.sh test
+
+iphone-deploy:
+	@echo "� Deploying to TestFlight via iPhone..."
+	./scripts/iphone_connect.sh deploy
+	@echo "🚀 TestFlight deployment guidance..."
+	./scripts/iphone_connect.sh deploy
+
+# Integration testing
+test-integration:
+	@echo "🧪 Running integration tests..."
+	flutter test integration_test/
+
+# Device testing (requires connected device)
+test-device:
+	@echo "📱 Running tests on connected device..."
+	flutter test integration_test/ -d ios
+
+# TestFlight automation (requires GitHub Actions)
+testflight:
+	@echo "🚀 Triggering TestFlight deployment via GitHub Actions..."
+	gh workflow run ios-device-distribution.yml --field distribution_type=testflight

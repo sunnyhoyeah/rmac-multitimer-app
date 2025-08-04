@@ -146,6 +146,10 @@ jobs:
           ### Downloads
           - Android APK: Available in the artifacts below
           - iOS IPA: Available in the artifacts below (requires signing)
+          
+          ### Deployment
+          - 🛫 TestFlight: Use `gh workflow run ios-appstore-deployment.yml` 
+          - 🏪 App Store: Use manual deployment with `make deploy-appstore`
         draft: false
         prerelease: false
 

@@ -65,6 +65,39 @@ This project includes automated CI/CD with GitHub Actions:
 - **Automated builds**: iOS and Android builds on every main branch push
 - **Release creation**: Automatic GitHub releases with build artifacts
 - **Code quality**: Automated testing, formatting, and analysis
+- **App Store Connect**: Automated TestFlight and App Store deployment
+
+### App Store Connect Deployment
+
+#### Setup (One-time)
+```bash
+# Setup App Store Connect environment
+./scripts/setup_appstore_env.sh
+
+# Setup Fastlane dependencies
+make setup-fastlane
+
+# Setup iOS certificates
+make ios-certificates
+```
+
+#### Deploy to TestFlight
+```bash
+# Local deployment
+make deploy-testflight
+
+# Or via GitHub Actions
+gh workflow run ios-appstore-deployment.yml -f deployment_type=testflight
+```
+
+#### Deploy to App Store
+```bash
+# Local deployment
+make deploy-appstore
+
+# Or via GitHub Actions
+gh workflow run ios-appstore-deployment.yml -f deployment_type=appstore
+```
 
 ### Manual Release Workflow
 
