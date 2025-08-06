@@ -48,8 +48,8 @@ echo -e "${BLUE}Deployment Type: $DEPLOYMENT_TYPE${NC}"
 echo ""
 
 # Validate deployment type
-if [[ ! "$DEPLOYMENT_TYPE" =~ ^(testflight|appstore)$ ]]; then
-    echo -e "${RED}Error: Invalid deployment type. Use 'testflight' or 'appstore'${NC}"
+if [[ ! "$DEPLOYMENT_TYPE" =~ ^(testflight|appstore|appstore-no-precheck)$ ]]; then
+    echo -e "${RED}Error: Invalid deployment type. Use 'testflight', 'appstore', or 'appstore-no-precheck'${NC}"
     exit 1
 fi
 
@@ -190,6 +190,35 @@ deploy_appstore() {
     echo -e "${BLUE}💡 Your app has been submitted for review${NC}"
 }
 
+# Deploy to App Store (skip precheck)
+deploy_appstore_no_precheck() {
+    echo -e "${PURPLE}🏪 Deploying to App Store (skipping precheck)...${NC}"
+    
+    echo -e "${YELLOW}⚠️  This will submit your app for App Store review!${NC}"
+    read -p "Are you sure you want to continue? (y/N): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo -e "${YELLOW}Deployment cancelled${NC}"
+        exit 0
+    fi
+    
+    cd ios
+    
+    # Create API key file
+    echo "$APP_STORE_CONNECT_API_KEY" | base64 --decode > AuthKey_$APP_STORE_CONNECT_API_KEY_ID.p8
+    
+    # Deploy using Fastlane (no precheck version)
+    bundle exec fastlane deploy_appstore_no_precheck release_notes:"$RELEASE_NOTES"
+    
+    # Cleanup
+    rm -f AuthKey_*.p8
+    
+    cd ..
+    
+    echo -e "${GREEN}✅ App Store deployment completed (precheck skipped)!${NC}"
+    echo -e "${BLUE}💡 Your app has been submitted for review${NC}"
+}
+
 # Show usage
 show_usage() {
     echo -e "${BLUE}🚀 App Store Connect Deployment Script${NC}"
@@ -227,6 +256,12 @@ main() {
             setup_environment
             get_version
             deploy_appstore
+            ;;
+        "appstore-no-precheck")
+            check_prerequisites
+            setup_environment
+            get_version
+            deploy_appstore_no_precheck
             ;;
         "help"|"--help"|"-h")
             show_usage

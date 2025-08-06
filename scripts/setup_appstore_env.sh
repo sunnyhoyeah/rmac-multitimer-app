@@ -14,6 +14,7 @@ PURPLE='\033[0;35m'
 NC='\033[0m' # No Color
 
 echo -e "${BLUE}🔧 RMAC MultiTimer - App Store Connect Environment Setup${NC}"
+echo -e "${YELLOW}Usage: $0 [--reset-api-key|-r]${NC}"
 echo ""
 
 # Function to prompt for input
@@ -206,34 +207,115 @@ test_deployment() {
     # Test API connection
     echo -e "${YELLOW}Testing App Store Connect API connection...${NC}"
     
-    # Create temporary API key file
-    echo "$APP_STORE_CONNECT_API_KEY" | base64 --decode > AuthKey_$APP_STORE_CONNECT_API_KEY_ID.p8
-    
-    # Test connection (this will just validate credentials)
-    if bundle exec fastlane run app_store_connect_api_key \
-        key_id:"$APP_STORE_CONNECT_API_KEY_ID" \
-        issuer_id:"$APP_STORE_CONNECT_ISSUER_ID" \
-        key_filepath:"AuthKey_$APP_STORE_CONNECT_API_KEY_ID.p8" &> /dev/null; then
-        echo -e "${GREEN}✅ App Store Connect API connection successful!${NC}"
-    else
-        echo -e "${RED}❌ App Store Connect API connection failed${NC}"
-        echo -e "${YELLOW}💡 Please check your API credentials${NC}"
+    # Verify that all required environment variables are set
+    if [ -z "$APP_STORE_CONNECT_API_KEY_ID" ] || [ -z "$APP_STORE_CONNECT_ISSUER_ID" ] || [ -z "$APP_STORE_CONNECT_API_KEY" ]; then
+        echo -e "${RED}❌ Missing required environment variables${NC}"
+        cd ..
+        return 1
     fi
     
-    # Cleanup
-    rm -f AuthKey_*.p8
+    # Test connection using a simple API call
+    echo -e "${YELLOW}Attempting to connect to App Store Connect API...${NC}"
+    
+    # Test connection using our custom test lane
+    echo -e "${YELLOW}Attempting to connect to App Store Connect API...${NC}"
+    
+    TEST_RESULT=$(bundle exec fastlane test_api 2>&1)
+    TEST_EXIT_CODE=$?
+    
+    if [ $TEST_EXIT_CODE -eq 0 ]; then
+        echo -e "${GREEN}✅ App Store Connect API connection successful!${NC}"
+        CONNECTION_SUCCESS=true
+    else
+        echo -e "${RED}❌ App Store Connect API connection failed${NC}"
+        echo -e "${YELLOW}💡 Error details:${NC}"
+        echo "$TEST_RESULT" | tail -10
+        echo ""
+        echo -e "${YELLOW}💡 Common issues:${NC}"
+        echo -e "   • Check that your API Key ID is correct"
+        echo -e "   • Check that your Issuer ID is correct"
+        echo -e "   • Ensure the .p8 file is valid"
+        echo -e "   • Verify your Apple Developer account has proper permissions"
+        echo -e "   • Make sure the API key hasn't been revoked"
+        CONNECTION_SUCCESS=false
+    fi
+    
+    # Cleanup is handled by Fastfile
     
     cd ..
     
-    echo -e "${GREEN}🎉 Setup test completed!${NC}"
+    if [ "$CONNECTION_SUCCESS" = true ]; then
+        echo -e "${GREEN}🎉 Setup test completed successfully!${NC}"
+        echo ""
+        echo -e "${BLUE}🚀 You can now run:${NC}"
+        echo -e "   make deploy-testflight"
+        echo -e "   make deploy-appstore"
+    else
+        echo -e "${RED}⚠️  Setup test failed - please check your credentials${NC}"
+        echo ""
+        echo -e "${YELLOW}💡 You can still try running deployment commands, but they may fail${NC}"
+    fi
+}
+
+# Reset API key configuration (for when permissions are insufficient)
+reset_api_key() {
+    echo -e "${BLUE}🔄 Resetting API Key Configuration${NC}"
     echo ""
-    echo -e "${BLUE}🚀 You can now run:${NC}"
-    echo -e "   make deploy-testflight"
-    echo -e "   make deploy-appstore"
+    echo -e "${YELLOW}💡 This will help you reconfigure with a new API key that has proper permissions${NC}"
+    echo ""
+    
+    # Clear existing API key variables
+    unset APP_STORE_CONNECT_API_KEY_ID
+    unset APP_STORE_CONNECT_ISSUER_ID
+    unset APP_STORE_CONNECT_API_KEY
+    
+    echo -e "${YELLOW}Step 1: Create New API Key${NC}"
+    echo -e "• Go to: https://appstoreconnect.apple.com/access/api"
+    echo -e "• Click '+' to create a new API key"
+    echo -e "• ⚠️  IMPORTANT: Select 'App Manager' role (NOT Developer)"
+    echo -e "• Download the .p8 file"
+    echo -e "• Note the Key ID and Issuer ID"
+    echo ""
+    
+    echo -e "${BLUE}Press Enter when you have created the new API key and are ready to configure it...${NC}"
+    read
+    
+    # Prompt for new API key details
+    prompt_input "Enter your NEW App Store Connect API Key ID" "APP_STORE_CONNECT_API_KEY_ID"
+    prompt_input "Enter your NEW App Store Connect Issuer ID" "APP_STORE_CONNECT_ISSUER_ID"
+    
+    echo -e "${YELLOW}💡 Provide the path to your NEW .p8 API key file${NC}"
+    prompt_input "Enter path to your NEW .p8 API key file" "API_KEY_PATH"
+    
+    if [ ! -f "$API_KEY_PATH" ]; then
+        echo -e "${RED}❌ File not found: $API_KEY_PATH${NC}"
+        exit 1
+    fi
+    
+    # Convert to base64
+    API_KEY_BASE64=$(base64 -i "$API_KEY_PATH")
+    export APP_STORE_CONNECT_API_KEY="$API_KEY_BASE64"
+    
+    echo ""
+    echo -e "${GREEN}✅ New API key configured!${NC}"
+    
+    # Update config file
+    generate_shell_config
+    
+    # Test the new configuration
+    echo ""
+    echo -e "${BLUE}Testing new API key...${NC}"
+    test_deployment
 }
 
 # Main execution
 main() {
+    # Check for reset flag
+    if [ "$1" = "--reset-api-key" ] || [ "$1" = "-r" ]; then
+        reset_api_key
+        return
+    fi
+    
     show_setup_instructions
     echo ""
     

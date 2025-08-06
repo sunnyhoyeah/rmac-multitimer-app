@@ -29,16 +29,24 @@ help:
 	@echo "  make version-minor   - Bump minor version (1.0.0 -> 1.1.0)"
 	@echo "  make version-major   - Bump major version (1.0.0 -> 2.0.0)"
 	@echo ""
-	@echo "🚀 Release commands:"
-	@echo "  make release-patch   - Bump patch version and create release"
-	@echo "  make release-minor   - Bump minor version and create release"
-	@echo "  make release-major   - Bump major version and create release"
+	@echo "🚀 Release commands (Git-triggered deployment):"
+	@echo "  make release-patch   - Bump patch version, commit, tag & deploy"
+	@echo "  make release-minor   - Bump minor version, commit, tag & deploy"
+	@echo "  make release-major   - Bump major version, commit, tag & deploy"
+	@echo "  make release-beta    - Create beta release to TestFlight"
+	@echo "  make release-alpha   - Create alpha release to TestFlight"
 	@echo ""
-	@echo "📱 App Store Connect:"
-	@echo "  make deploy-testflight  - Deploy to TestFlight"
-	@echo "  make deploy-appstore    - Deploy to App Store"
+	@echo "📱 Manual App Store Connect (local deployment):"
+	@echo "  make deploy-testflight  - Deploy to TestFlight (manual)"
+	@echo "  make deploy-appstore    - Deploy to App Store (manual)"
+	@echo "  make deploy-appstore-no-precheck - Deploy to App Store (skip precheck)"
 	@echo "  make setup-fastlane     - Setup Fastlane dependencies"
 	@echo "  make ios-certificates   - Setup iOS certificates"
+	@echo ""
+	@echo "🔍 Preview commands:"
+	@echo "  make preview-release-patch - Preview patch release changes"
+	@echo "  make preview-release-minor - Preview minor release changes"
+	@echo "  make preview-release-major - Preview major release changes"
 
 # Setup development environment
 setup:
@@ -89,7 +97,7 @@ build-debug:
 	@echo "🔧 Building debug versions..."
 	./scripts/build.sh all debug
 
-# Version management
+# Version management (manual version bump only)
 version-patch:
 	@echo "📦 Bumping patch version..."
 	./scripts/bump_version.sh patch
@@ -102,33 +110,41 @@ version-major:
 	@echo "📦 Bumping major version..."
 	./scripts/bump_version.sh major
 
-# Release commands (version bump + git commit + tag + push)
-release-patch: version-patch
-	@echo "🚀 Creating patch release..."
-	$(eval NEW_VERSION := $(shell grep '^version:' pubspec.yaml | cut -d' ' -f2 | cut -d'+' -f1))
-	git add pubspec.yaml
-	git commit -m "chore: bump version to $(NEW_VERSION)"
-	git tag v$(NEW_VERSION)
-	git push origin main --tags
-	@echo "✅ Release v$(NEW_VERSION) created!"
+# Git-triggered release commands (automated deployment)
+release-patch:
+	@echo "🚀 Creating patch release (automated deployment)..."
+	./scripts/release.sh patch
 
-release-minor: version-minor
-	@echo "🚀 Creating minor release..."
-	$(eval NEW_VERSION := $(shell grep '^version:' pubspec.yaml | cut -d' ' -f2 | cut -d'+' -f1))
-	git add pubspec.yaml
-	git commit -m "chore: bump version to $(NEW_VERSION)"
-	git tag v$(NEW_VERSION)
-	git push origin main --tags
-	@echo "✅ Release v$(NEW_VERSION) created!"
+release-minor:
+	@echo "🚀 Creating minor release (automated deployment)..."
+	./scripts/release.sh minor
 
-release-major: version-major
-	@echo "🚀 Creating major release..."
-	$(eval NEW_VERSION := $(shell grep '^version:' pubspec.yaml | cut -d' ' -f2 | cut -d'+' -f1))
-	git add pubspec.yaml
-	git commit -m "chore: bump version to $(NEW_VERSION)"
-	git tag v$(NEW_VERSION)
-	git push origin main --tags
-	@echo "✅ Release v$(NEW_VERSION) created!"
+release-major:
+	@echo "🚀 Creating major release (automated deployment)..."
+	./scripts/release.sh major
+
+release-beta:
+	@echo "🧪 Creating beta release (TestFlight)..."
+	@read -p "Enter release notes: " notes; \
+	./scripts/release.sh patch "$$notes" --beta
+
+release-alpha:
+	@echo "🧪 Creating alpha release (TestFlight)..."
+	@read -p "Enter release notes: " notes; \
+	./scripts/release.sh patch "$$notes" --alpha
+
+# Preview release changes (dry run)
+preview-release-patch:
+	@echo "🔍 Previewing patch release..."
+	./scripts/release.sh patch "" true
+
+preview-release-minor:
+	@echo "🔍 Previewing minor release..."
+	./scripts/release.sh minor "" true
+
+preview-release-major:
+	@echo "🔍 Previewing major release..."
+	./scripts/release.sh major "" true
 
 # Development commands
 dev-ios:
@@ -159,6 +175,10 @@ deploy-testflight:
 deploy-appstore:
 	@echo "🏪 Deploying to App Store..."
 	./scripts/appstore_deploy.sh appstore "New release with latest features"
+
+deploy-appstore-no-precheck:
+	@echo "🏪 Deploying to App Store (skip precheck)..."
+	./scripts/appstore_deploy.sh appstore-no-precheck "New release with latest features"
 
 # iOS-specific setup
 setup-fastlane:

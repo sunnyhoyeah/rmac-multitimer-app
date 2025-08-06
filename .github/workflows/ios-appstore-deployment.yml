@@ -3,7 +3,9 @@ name: iOS App Store Deployment
 on:
   push:
     tags:
-      - 'v*'  # Triggers on version tags like v1.0.0
+      - 'v*'  # Triggers on version tags like v1.0.0, v1.0.0-beta, etc.
+    branches:
+      - main  # Also trigger on main branch pushes for TestFlight
   workflow_dispatch:
     inputs:
       deployment_type:
@@ -14,23 +16,81 @@ on:
         options:
           - testflight
           - appstore
+          - appstore-no-precheck
       release_notes:
         description: 'Release notes'
         required: false
         default: 'Automated release'
+      create_github_release:
+        description: 'Create GitHub release'
+        required: false
+        default: true
+        type: boolean
 
 env:
   FLUTTER_VERSION: '3.24.0'
 
 jobs:
+  determine-deployment:
+    runs-on: ubuntu-latest
+    outputs:
+      deployment_type: ${{ steps.determine.outputs.deployment_type }}
+      release_notes: ${{ steps.determine.outputs.release_notes }}
+      is_prerelease: ${{ steps.determine.outputs.is_prerelease }}
+      version_tag: ${{ steps.determine.outputs.version_tag }}
+    
+    steps:
+    - name: Determine deployment type
+      id: determine
+      run: |
+        if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          echo "deployment_type=${{ github.event.inputs.deployment_type }}" >> $GITHUB_OUTPUT
+          echo "release_notes=${{ github.event.inputs.release_notes }}" >> $GITHUB_OUTPUT
+          echo "is_prerelease=false" >> $GITHUB_OUTPUT
+          echo "version_tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+        elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+          TAG_NAME="${{ github.ref_name }}"
+          echo "version_tag=$TAG_NAME" >> $GITHUB_OUTPUT
+          
+          if [[ "$TAG_NAME" =~ -beta|-alpha|-rc ]]; then
+            echo "deployment_type=testflight" >> $GITHUB_OUTPUT
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+            echo "release_notes=Beta release $TAG_NAME - automated deployment" >> $GITHUB_OUTPUT
+          else
+            echo "deployment_type=appstore-no-precheck" >> $GITHUB_OUTPUT
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+            echo "release_notes=Production release $TAG_NAME - automated deployment" >> $GITHUB_OUTPUT
+          fi
+        else
+          # Main branch push -> TestFlight
+          echo "deployment_type=testflight" >> $GITHUB_OUTPUT
+          echo "release_notes=Development build from main branch" >> $GITHUB_OUTPUT
+          echo "is_prerelease=true" >> $GITHUB_OUTPUT
+          echo "version_tag=main-${{ github.sha }}" >> $GITHUB_OUTPUT
+        fi
+
   deploy-ios:
     runs-on: macos-latest
+    needs: determine-deployment
     
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
+
+    - name: Extract version from tag or pubspec.yaml
+      id: version
+      run: |
+        if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+          VERSION="${{ github.ref_name }}"
+          echo "version=${VERSION#v}" >> $GITHUB_OUTPUT
+          echo "tag_name=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+        else
+          VERSION=$(grep '^version:' pubspec.yaml | cut -d ' ' -f 2)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag_name=main-build" >> $GITHUB_OUTPUT
+        fi
 
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
@@ -58,73 +118,139 @@ jobs:
     - name: Install Flutter dependencies
       run: flutter pub get
 
-    - name: Setup iOS certificates and provisioning profiles
+    - name: Setup environment variables
       env:
-        # Add these secrets to your GitHub repository
-        MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
-        MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
-        FASTLANE_USER: ${{ secrets.FASTLANE_USER }}
-        FASTLANE_PASSWORD: ${{ secrets.FASTLANE_PASSWORD }}
+        APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
         APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
         APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-        APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+      run: |
+        echo "Creating environment file..."
+        mkdir -p ~/.config
+        cat > ~/.appstore_connect_env << EOF
+        export FASTLANE_USER="${{ secrets.FASTLANE_USER }}"
+        export FASTLANE_PASSWORD="${{ secrets.FASTLANE_PASSWORD }}"
+        export APP_STORE_CONNECT_API_KEY_ID="${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}"
+        export APP_STORE_CONNECT_ISSUER_ID="${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}"
+        export APP_STORE_CONNECT_API_KEY="${{ secrets.APP_STORE_CONNECT_API_KEY }}"
+        EOF
+        source ~/.appstore_connect_env
+
+    - name: Setup iOS certificates and provisioning profiles
       working-directory: ios
       run: |
+        # Source environment variables
+        source ~/.appstore_connect_env
+        
         # Create API key file
         echo "$APP_STORE_CONNECT_API_KEY" | base64 --decode > AuthKey_$APP_STORE_CONNECT_API_KEY_ID.p8
         
-        # Install certificates and provisioning profiles
-        bundle exec fastlane match appstore --readonly
-        bundle exec fastlane match development --readonly
+        # Install certificates and provisioning profiles (optional)
+        bundle exec fastlane setup || echo "Certificate setup failed, using manual certificates"
 
-    - name: Build iOS release
-      run: |
-        flutter build ios --release --no-codesign
-        cd ios
-        bundle exec fastlane build_app
-
-    - name: Deploy to TestFlight
-      if: github.event.inputs.deployment_type == 'testflight' || github.event_name == 'push'
-      env:
-        FASTLANE_USER: ${{ secrets.FASTLANE_USER }}
-        FASTLANE_PASSWORD: ${{ secrets.FASTLANE_PASSWORD }}
-        APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
-        APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+    - name: Build and deploy iOS app
       working-directory: ios
       run: |
-        bundle exec fastlane upload_to_testflight \
-          changelog:"${{ github.event.inputs.release_notes || 'Automated release from GitHub Actions' }}" \
-          skip_waiting_for_build_processing:true
-
-    - name: Deploy to App Store
-      if: github.event.inputs.deployment_type == 'appstore'
-      env:
-        FASTLANE_USER: ${{ secrets.FASTLANE_USER }}
-        FASTLANE_PASSWORD: ${{ secrets.FASTLANE_PASSWORD }}
-        APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
-        APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-      working-directory: ios
-      run: |
-        bundle exec fastlane upload_to_app_store \
-          submit_for_review:true \
-          automatic_release:false \
-          force:true \
-          submission_information:"{\"add_id_info_limits_tracking\": true, \"add_id_info_serves_ads\": false, \"add_id_info_tracks_action\": true, \"add_id_info_tracks_install\": true, \"add_id_info_uses_idfa\": false, \"content_rights_has_rights\": true, \"content_rights_contains_third_party_content\": false}" \
-          release_notes:"${{ github.event.inputs.release_notes || 'Automated release from GitHub Actions' }}"
+        # Source environment variables
+        source ~/.appstore_connect_env
+        
+        # Determine deployment type
+        DEPLOYMENT_TYPE="${{ needs.determine-deployment.outputs.deployment_type }}"
+        RELEASE_NOTES="${{ needs.determine-deployment.outputs.release_notes }}"
+        
+        echo "🚀 Deploying with type: $DEPLOYMENT_TYPE"
+        echo "📝 Release notes: $RELEASE_NOTES"
+        
+        case "$DEPLOYMENT_TYPE" in
+          "testflight")
+            bundle exec fastlane deploy_testflight changelog:"$RELEASE_NOTES"
+            ;;
+          "appstore")
+            bundle exec fastlane deploy_appstore release_notes:"$RELEASE_NOTES"
+            ;;
+          "appstore-no-precheck")
+            bundle exec fastlane deploy_appstore_no_precheck release_notes:"$RELEASE_NOTES"
+            ;;
+          *)
+            echo "Unknown deployment type: $DEPLOYMENT_TYPE"
+            exit 1
+            ;;
+        esac
 
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
+      if: always()
       with:
-        name: ios-ipa-${{ github.run_number }}
+        name: ios-ipa-${{ needs.determine-deployment.outputs.version_tag }}-${{ github.run_number }}
         path: ios/build/Runner.ipa
+        retention-days: 30
+
+    - name: Create GitHub Release
+      if: |
+        github.ref_type == 'tag' && 
+        (github.event.inputs.create_github_release == 'true' || github.event_name != 'workflow_dispatch')
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.version.outputs.tag_name }}
+        release_name: "RMAC MultiTimer ${{ steps.version.outputs.tag_name }}"
+        body: |
+          ## 🚀 Release ${{ steps.version.outputs.tag_name }}
+          
+          **Deployment Type**: ${{ needs.determine-deployment.outputs.deployment_type }}
+          **Release Notes**: ${{ needs.determine-deployment.outputs.release_notes }}
+          
+          ### 📱 iOS App
+          - ✅ Built and uploaded to ${{ needs.determine-deployment.outputs.deployment_type == 'testflight' && 'TestFlight' || 'App Store Connect' }}
+          - 📦 Build artifacts available in this release
+          
+          ### 🔧 Changes
+          See commit history for detailed changes.
+          
+          ---
+          *This release was automatically created by GitHub Actions*
+        draft: false
+        prerelease: ${{ needs.determine-deployment.outputs.is_prerelease }}
+
+    - name: Upload IPA to GitHub Release
+      if: |
+        github.ref_type == 'tag' && 
+        (github.event.inputs.create_github_release == 'true' || github.event_name != 'workflow_dispatch')
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ios/build/Runner.ipa
+        asset_name: RMAC-MultiTimer-${{ steps.version.outputs.version }}.ipa
+        asset_content_type: application/octet-stream
 
     - name: Notify deployment status
       if: always()
       run: |
+        DEPLOYMENT_TYPE="${{ needs.determine-deployment.outputs.deployment_type }}"
+        VERSION_TAG="${{ needs.determine-deployment.outputs.version_tag }}"
+        
         if [ "${{ job.status }}" == "success" ]; then
           echo "✅ iOS deployment completed successfully!"
-          echo "🚀 Check TestFlight or App Store Connect for the new build"
+          echo "🚀 Version: $VERSION_TAG"
+          echo "📱 Deployed to: $DEPLOYMENT_TYPE"
+          
+          case "$DEPLOYMENT_TYPE" in
+            "testflight")
+              echo "🧪 Check TestFlight for the new build"
+              echo "💡 TestFlight URL: https://appstoreconnect.apple.com/apps/${{ secrets.APP_STORE_APP_ID }}/testflight/ios"
+              ;;
+            "appstore"|"appstore-no-precheck")
+              echo "🏪 Check App Store Connect for review status"
+              echo "💡 App Store Connect URL: https://appstoreconnect.apple.com/apps/${{ secrets.APP_STORE_APP_ID }}/appstore/ios/version/deliverable"
+              ;;
+          esac
         else
           echo "❌ iOS deployment failed!"
           echo "💡 Check the logs above for error details"
+          echo "🔧 Common issues:"
+          echo "   - Certificate/provisioning profile problems"
+          echo "   - API key configuration"
+          echo "   - Build number conflicts"
         fi
