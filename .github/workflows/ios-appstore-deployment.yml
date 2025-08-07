@@ -102,8 +102,14 @@ jobs:
       uses: ruby/setup-ruby@v1
       with:
         ruby-version: '3.0'
-        bundler-cache: true
+        bundler-cache: false
         working-directory: ios
+    
+    - name: Install Ruby dependencies
+      working-directory: ios
+      run: |
+        gem install bundler
+        bundle install --retry=3 --jobs=4
 
     - name: Cache Flutter dependencies
       uses: actions/cache@v4
@@ -138,6 +144,15 @@ jobs:
     - name: Setup iOS certificates and provisioning profiles
       working-directory: ios
       run: |
+        # Debug: Check current directory and files
+        echo "Current directory: $(pwd)"
+        echo "Files in current directory:"
+        ls -la
+        echo "Checking for Gemfile:"
+        ls -la Gemfile* || echo "No Gemfile found"
+        echo "Checking bundle status:"
+        bundle --version
+        
         # Source environment variables
         source ~/.appstore_connect_env
         
@@ -150,6 +165,12 @@ jobs:
     - name: Build and deploy iOS app
       working-directory: ios
       run: |
+        # Debug: Check current directory and bundle status
+        echo "Current directory: $(pwd)"
+        echo "Bundle status:"
+        bundle --version
+        bundle list || echo "Bundle list failed"
+        
         # Source environment variables
         source ~/.appstore_connect_env
         
