@@ -1,11 +1,18 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:math';
-import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart'; 
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Lock orientation to portrait only
+  SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
+  
   runApp(MyApp());
 }
 
@@ -26,7 +33,8 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen> {
   static const List<String> quotes = [
-    "靜待這一秒世界改善，抑或把握這一秒跑遍世界。",
+    "改變",
+    //"靜待這一秒世界改善，抑或把握這一秒跑遍世界。",
   ];
 
   late String randomQuote;
@@ -388,6 +396,9 @@ class _TimerRowState extends State<TimerRow> {
 
   void stopTimer() {
     if (isRunning) {
+      // Take a final lap time before stopping
+      takeLapTime();
+      
       stopwatch.stop();
       lapStopwatch.stop();
       _periodicTimer?.cancel();
@@ -412,8 +423,11 @@ class _TimerRowState extends State<TimerRow> {
   }
 
   void resetTimer() {
+    stopwatch.stop();
     stopwatch.reset();
+    lapStopwatch.stop();
     lapStopwatch.reset();
+    _periodicTimer?.cancel(); // Cancel the periodic timer
     setState(() {
       isRunning = false;
       timerValue = '00:00:00';
@@ -500,150 +514,7 @@ class _TimerRowState extends State<TimerRow> {
     : Colors.white;
     //final Color buttonColor = isRunning ? Colors.deepOrange[300]! : Colors.orange[200]!;
     
-    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
-    final textStyle = TextStyle(
-      fontSize: 16.0,
-      fontWeight: FontWeight.normal,
-      color: Colors.black,
-      fontFamily: 'Courier',
-    );
-
-    if (isLandscape) {
-      return Container(
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey),
-        ),
-        padding: EdgeInsets.symmetric(vertical: 2.0, horizontal: 8.0),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // Start/Stop button
-            Padding(
-              padding: const EdgeInsets.only(left: 4.0, right: 2.0),
-              child: IconButton(
-                icon: isRunning
-                    ? Image.asset('assets/stop.png', width: 40, height: 40)
-                    : Image.asset('assets/start.png', width: 40, height: 40),
-                onPressed: () {
-                  HapticFeedback.mediumImpact();
-                  isRunning ? stopTimer() : startTimer();
-                },
-                iconSize: 40,
-                padding: EdgeInsets.zero,
-                constraints: BoxConstraints(minWidth: 40, minHeight: 40),
-                visualDensity: VisualDensity.compact,
-              ),
-            ),
-            // Lap/Reset button
-            Padding(
-              padding: const EdgeInsets.only(left: 4.0, right: 8.0),
-              child: IconButton(
-                icon: isRunning
-                    ? Image.asset('assets/lap.png', width: 40, height: 40)
-                    : Image.asset('assets/reset.png', width: 40, height: 40),
-                onPressed: () {
-                  HapticFeedback.mediumImpact();
-                  isRunning ? takeLapTime() : resetTimer();
-                },
-                iconSize: 40,
-                padding: EdgeInsets.zero,
-                constraints: BoxConstraints(minWidth: 40, minHeight: 40),
-                visualDensity: VisualDensity.compact,
-              ),
-            ),
-            // RunnerName
-            Expanded(
-              flex: 2,
-              child: GestureDetector(
-                onTap: () async {
-                  setState(() {
-                    isEditingName = true;
-                  });
-                  await Future.delayed(Duration(milliseconds: 100));
-                  _nameFocusNode.requestFocus();
-                  widget.scrollController.animateTo(
-                    widget.rowIndex * widget.rowHeight,
-                    duration: Duration(milliseconds: 300),
-                    curve: Curves.easeInOut,
-                  );
-                },
-                child: Container(
-                  alignment: Alignment.centerLeft,
-                  color: Colors.transparent,
-                  child: isEditingName
-                      ? TextField(
-                          controller: _nameController,
-                          focusNode: _nameFocusNode,
-                          autofocus: true,
-                          textAlign: TextAlign.left,
-                          onSubmitted: (_) {
-                            _finishEditingName();
-                          },
-                          decoration: InputDecoration(
-                            border: InputBorder.none,
-                            isDense: true,
-                            contentPadding: EdgeInsets.only(left: 0),
-                          ),
-                          style: textStyle,
-                        )
-                      : Text(
-                          _nameController.text.isEmpty ? ' ' : _nameController.text,
-                          style: textStyle,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.left,
-                        ),
-                ),
-              ),
-            ),
-            // Last two lap texts
-            Expanded(
-              flex: 3,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  for (var i = min(1, lapEntries.length - 1); i >= 0; i--)
-                    Expanded(
-                      child: Text(
-                        'Lap ${lapEntries.length - i}: ${lapEntries[i].lapTime}',
-                        style: textStyle,
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: 1,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            SizedBox(
-              width: 110, // Adjust as needed for your layout
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerRight,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      timerValue,
-                      style: textStyle.copyWith(fontSize: 18), // reduced font size
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                      textAlign: TextAlign.right,
-                    ),
-                    Text(
-                      currentLapTimeValue,
-                      style: textStyle.copyWith(fontSize: 18, color: Colors.red), // slightly smaller
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                      textAlign: TextAlign.right,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
+    // Portrait layout only (landscape mode disabled)
     return Container(
       decoration: BoxDecoration(),
       padding: EdgeInsets.symmetric(vertical: 0.0, horizontal: 8.0),
@@ -652,7 +523,7 @@ class _TimerRowState extends State<TimerRow> {
           children: [
             // Start/Stop and Lap/Reset buttons
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8.0), // <-- Match timer row padding
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
               child: SizedBox(
                 width: 60,
                 height: 80,
@@ -681,7 +552,7 @@ class _TimerRowState extends State<TimerRow> {
             ),
             SizedBox(width: 8),
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8.0), // <-- Match timer row padding
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
               child: SizedBox(
                 width: 60,
                 height: 80,
@@ -709,187 +580,190 @@ class _TimerRowState extends State<TimerRow> {
               ),
             ),
             SizedBox(width: 16),
-            // Left column: timerValue and runner name
-            Flexible(
-              flex: 1,
+            // Right side content area
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.max,
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4.0), // <-- Add vertical padding
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(
-                        timerValue,
-                        style: TextStyle(
-                          fontSize: MediaQuery.of(context).size.width < 376 ? 20 : 30,
-                          fontFamily: 'Courier',
-                          height: 1,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black,
+                  // Top row: Runner name
+                  Expanded(
+                    flex: 1,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6.0),
+                      child: GestureDetector(
+                        onTap: () async {
+                          setState(() {
+                            isEditingName = true;
+                          });
+                          await Future.delayed(Duration(milliseconds: 100));
+                          _nameFocusNode.requestFocus();
+                          widget.scrollController.animateTo(
+                            widget.rowIndex * widget.rowHeight,
+                            duration: Duration(milliseconds: 300),
+                            curve: Curves.easeInOut,
+                          );
+                        },
+                        child: Container(
+                          width: double.infinity,
+                          alignment: Alignment.centerLeft,
+                          color: Colors.transparent,
+                          child: isEditingName
+                              ? TextField(
+                                  controller: _nameController,
+                                  focusNode: _nameFocusNode,
+                                  autofocus: true,
+                                  textAlign: TextAlign.left,
+                                  onSubmitted: (_) {
+                                    _finishEditingName();
+                                  },
+                                  decoration: InputDecoration(
+                                    border: InputBorder.none,
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.only(left: 0),
+                                  ),
+                                  style: TextStyle(
+                                    fontSize: 18.0,
+                                    fontWeight: FontWeight.normal,
+                                    color: Colors.black,
+                                    fontFamily: 'Courier',
+                                  ),
+                                )
+                              : Text(
+                                  _nameController.text.isEmpty ? ' ' : _nameController.text,
+                                  style: TextStyle(
+                                    fontSize: 18.0,
+                                    fontWeight: FontWeight.normal,
+                                    color: Colors.black,
+                                    fontFamily: 'Courier',
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.left,
+                                ),
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.right,
                       ),
                     ),
                   ),
-                  Spacer(),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 6.0), // <-- Add vertical padding
-                    child: GestureDetector(
-                      onTap: () async {
-                        setState(() {
-                          isEditingName = true;
-                        });
-                        await Future.delayed(Duration(milliseconds: 100));
-                        _nameFocusNode.requestFocus();
-                        widget.scrollController.animateTo(
-                          widget.rowIndex * widget.rowHeight,
-                          duration: Duration(milliseconds: 300),
-                          curve: Curves.easeInOut,
-                        );
-                      },
-                      child: Container(
-                        width: double.infinity,
-                        alignment: Alignment.centerLeft,
-                        color: Colors.transparent,
-                        child: isEditingName
-                            ? TextField(
-                                controller: _nameController,
-                                focusNode: _nameFocusNode,
-                                autofocus: true,
-                                textAlign: TextAlign.left,
-                                onSubmitted: (_) {
-                                  _finishEditingName();
-                                },
-                                decoration: InputDecoration(
-                                  border: InputBorder.none,
-                                  isDense: true,
-                                  contentPadding: EdgeInsets.only(left: 0),
-                                ),
-                                style: TextStyle(
-                                  fontSize: 18.0,
-                                  fontWeight: FontWeight.normal,
-                                  color: Colors.black,
-                                  fontFamily: 'Courier',
-                                ),
-                              )
-                            : Text(
-                                _nameController.text.isEmpty ? ' ' : _nameController.text,
-                                style: TextStyle(
-                                  fontSize: 18.0,
-                                  fontWeight: FontWeight.normal,
-                                  color: Colors.black,
-                                  fontFamily: 'Courier',
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                                textAlign: TextAlign.left,
-                              ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(width: 16),
-            // Right column: currentLapTimeValue and last two lap rows
-            // In the right column, use Expanded and FittedBox for each timer row to ensure even font size and no overflow:
-
-            Flexible(
-              flex: 1,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Current lap number and timer (always at the top)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4.0), // <-- Add vertical padding
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerLeft,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            '$currentLapNumber',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.red,
-                              fontFamily: 'Courier',
-                              height: 1,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.left,
-                          ),
-                          SizedBox(width: 4),
-                          Text(
-                            currentLapTimeValue,
-                            style: TextStyle(
-                              fontSize: MediaQuery.of(context).size.width < 376 ? 20 : 30,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.red,
-                              fontFamily: 'Courier',
-                              height: 1,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.left,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  // Last two lap rows
-                  if (lapEntries.isNotEmpty)
-                    ...[
-                      for (var i = 0; i < lapEntries.length && i < 2; i++)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4.0), // <-- Add vertical padding
-                          child: GestureDetector(
-                            onTap: _showLapTimesDialog,
+                  // Bottom row: Timer value (large) and lap times (smaller)
+                  Expanded(
+                    flex: 2,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        // Left column: Main timer value (larger font)
+                        Expanded(
+                          flex: 1,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4.0),
                             child: FittedBox(
                               fit: BoxFit.scaleDown,
-                              alignment: Alignment.centerLeft,
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    '${lapEntries.length - i}',
-                                    style: TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.deepOrange[300], 
-                                      fontFamily: 'Courier',
-                                      height: 1,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    textAlign: TextAlign.left,
-                                  ),
-                                  SizedBox(width: 4),
-                                  Text(
-                                    lapEntries[i].lapTime,
-                                    style: TextStyle(
-                                      fontSize: MediaQuery.of(context).size.width < 376 ? 20 : 30,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.black,
-                                      fontFamily: 'Courier',
-                                      height: 1,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    textAlign: TextAlign.left,
-                                  ),
-                                ],
+                              child: Text(
+                                timerValue,
+                                style: TextStyle(
+                                  fontSize: 44, // Reduced from 48 to prevent overflow
+                                  fontFamily: 'Courier',
+                                  height: 1,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
                               ),
                             ),
                           ),
                         ),
-                    ],
+                        // Right column: Current lap and last 2 lap times (smaller fonts)
+                        Expanded(
+                          flex: 1,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.end, // Align to right
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              // Current lap number and timer
+                              Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 1.0, horizontal: 4.0),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.end, // Align row content to right
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      '$currentLapNumber',
+                                      style: TextStyle(
+                                        fontSize: 14, // Reduced from 16 to prevent overflow
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.red,
+                                        fontFamily: 'Courier',
+                                        height: 1,
+                                      ),
+                                    ),
+                                    SizedBox(width: 2),
+                                    Flexible(
+                                      child: Text(
+                                        currentLapTimeValue,
+                                        style: TextStyle(
+                                          fontSize: 18, // Reduced from 20 to prevent overflow
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.red,
+                                          fontFamily: 'Courier',
+                                          height: 1,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        textAlign: TextAlign.right,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              // Last two lap rows
+                              if (lapEntries.isNotEmpty)
+                                ...[
+                                  for (var i = 0; i < lapEntries.length && i < 2; i++)
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(vertical: 1.0, horizontal: 4.0),
+                                      child: GestureDetector(
+                                        onTap: _showLapTimesDialog,
+                                        child: Row(
+                                          mainAxisAlignment: MainAxisAlignment.end, // Align row content to right
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                              '${lapEntries.length - i}',
+                                              style: TextStyle(
+                                                fontSize: 14, // Reduced from 16 to prevent overflow
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.deepOrange[300], 
+                                                fontFamily: 'Courier',
+                                                height: 1,
+                                              ),
+                                            ),
+                                            SizedBox(width: 2),
+                                            Flexible(
+                                              child: Text(
+                                                lapEntries[i].lapTime,
+                                                style: TextStyle(
+                                                  fontSize: 18, // Reduced from 20 to prevent overflow
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.black,
+                                                  fontFamily: 'Courier',
+                                                  height: 1,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                textAlign: TextAlign.right,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
