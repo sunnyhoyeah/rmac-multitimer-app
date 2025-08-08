@@ -54,6 +54,9 @@ def configure_api_key
         in_house: false
       )
       
+      # Set the API key globally for Fastlane
+      Spaceship::ConnectAPI.set_token(@api_key)
+      
       # Store the file path for cleanup
       @api_key_file = api_key_file
       
@@ -359,7 +362,7 @@ platform :ios do
       # Try to setup certificates, but don't fail if match isn't configured
       begin
         UI.message("Setting up certificates and provisioning profiles...")
-        match(type: "appstore", readonly: true, api_key: @api_key)
+        match(type: "appstore", readonly: true)
       rescue => ex
         UI.important("⚠️  Certificate management (match) not configured: #{ex.message}")
         UI.important("💡 You can still build if you have certificates installed manually in Xcode")
@@ -392,7 +395,7 @@ platform :ios do
       # Try to setup certificates, but don't fail if match isn't configured
       begin
         UI.message("Setting up certificates and provisioning profiles...")
-        match(type: "appstore", readonly: true, api_key: @api_key)
+        match(type: "appstore", readonly: true)
       rescue => ex
         UI.important("⚠️  Certificate management (match) not configured: #{ex.message}")
         UI.important("💡 You can still build if you have certificates installed manually in Xcode")
