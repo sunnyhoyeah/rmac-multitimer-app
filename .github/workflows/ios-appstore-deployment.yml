@@ -106,8 +106,12 @@ jobs:
         working-directory: ios
     
     - name: Install Ruby dependencies
-      working-directory: ios
       run: |
+        echo "Current directory: $(pwd)"
+        cd ios
+        echo "Working directory after cd: $(pwd)"
+        echo "Files in directory:"
+        ls -la
         gem install bundler
         bundle install --retry=3 --jobs=4
 
@@ -142,8 +146,9 @@ jobs:
         source ~/.appstore_connect_env
 
     - name: Setup iOS certificates and provisioning profiles
-      working-directory: ios
       run: |
+        cd ios
+        
         # Debug: Check current directory and files
         echo "Current directory: $(pwd)"
         echo "Files in current directory:"
@@ -163,8 +168,9 @@ jobs:
         bundle exec fastlane setup || echo "Certificate setup failed, using manual certificates"
 
     - name: Build and deploy iOS app
-      working-directory: ios
       run: |
+        cd ios
+        
         # Debug: Check current directory and bundle status
         echo "Current directory: $(pwd)"
         echo "Bundle status:"
