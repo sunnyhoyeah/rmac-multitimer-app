@@ -1,0 +1,13 @@
+# Gemfile for iOS automation
+source "https://rubygems.org"
+
+# Ruby 3.4+ compatibility
+gem "abbrev", "~> 0.1"
+gem "ostruct", "~> 0.6"
+
+gem "fastlane", "~> 2.219"
+gem "cocoapods", "~> 1.15"
+
+# Fastlane plugins
+plugins_path = File.join(File.dirname(__FILE__), 'fastlane', 'Pluginfile')
+eval_gemfile(plugins_path) if File.exist?(plugins_path)

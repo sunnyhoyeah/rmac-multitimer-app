@@ -1,0 +1,395 @@
+# Fastlane configuration for RMAC MultiTimer
+# This file contains the fastlane.tools configuration
+
+require 'base64'
+
+default_platform(:ios)
+
+# Constants
+APP_IDENTIFIER = "com.example.multitimerTrackfield"
+WORKSPACE = "Runner.xcworkspace"
+SCHEME = "Runner"
+
+# Configure App Store Connect API Key
+def configure_api_key
+  if ENV["APP_STORE_CONNECT_API_KEY_ID"] && ENV["APP_STORE_CONNECT_ISSUER_ID"] && ENV["APP_STORE_CONNECT_API_KEY"]
+    begin
+      # Create API key file from base64 encoded content
+      api_key_file = "AuthKey_#{ENV['APP_STORE_CONNECT_API_KEY_ID']}.p8"
+      File.write(api_key_file, Base64.decode64(ENV["APP_STORE_CONNECT_API_KEY"]))
+      
+      # Configure the API key and return the key object
+      @api_key = app_store_connect_api_key(
+        key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
+        issuer_id: ENV["APP_STORE_CONNECT_ISSUER_ID"],
+        key_filepath: File.expand_path(api_key_file),
+        duration: 1200, # 20 minutes
+        in_house: false
+      )
+      
+      # Store the file path for cleanup
+      @api_key_file = api_key_file
+      
+      UI.success("Successfully configured App Store Connect API key")
+      return @api_key
+    rescue => error
+      UI.error("Failed to configure API key: #{error.message}")
+      return nil
+    end
+  else
+    missing_vars = []
+    missing_vars << "APP_STORE_CONNECT_API_KEY_ID" unless ENV["APP_STORE_CONNECT_API_KEY_ID"]
+    missing_vars << "APP_STORE_CONNECT_ISSUER_ID" unless ENV["APP_STORE_CONNECT_ISSUER_ID"]
+    missing_vars << "APP_STORE_CONNECT_API_KEY" unless ENV["APP_STORE_CONNECT_API_KEY"]
+    UI.error("Missing required environment variables: #{missing_vars.join(', ')}")
+    return nil
+  end
+end
+
+# Cleanup API key file
+def cleanup_api_key
+  if @api_key_file && File.exist?(@api_key_file)
+    File.delete(@api_key_file)
+    UI.message("Cleaned up API key file")
+  end
+end
+
+platform :ios do
+  
+  desc "Check if app exists in App Store Connect"
+  lane :check_app do
+    # Configure API key
+    @api_key = configure_api_key
+    if @api_key == nil
+      UI.error("Failed to configure API key")
+      raise "API configuration failed"
+    end
+    
+    begin
+      # Try to find the app
+      app = Spaceship::ConnectAPI::App.find(APP_IDENTIFIER)
+      if app
+        UI.success("✅ Found app in App Store Connect!")
+        UI.message("App Name: #{app.name}")
+        UI.message("Bundle ID: #{app.bundle_id}")
+        UI.message("App ID: #{app.id}")
+        
+        # Get app store versions
+        versions = app.get_app_store_versions
+        if versions && !versions.empty?
+          UI.message("App Store Versions:")
+          versions.each do |version|
+            UI.message("  - Version #{version.version_string}: #{version.app_store_state}")
+          end
+        else
+          UI.message("No App Store versions found - you can upload your first build!")
+        end
+      else
+        UI.error("❌ Could not find app with bundle ID: #{APP_IDENTIFIER}")
+      end
+    rescue => error
+      UI.error("Error checking app: #{error.message}")
+      UI.error(error.backtrace.first(5).join("\n")) if error.backtrace
+    ensure
+      cleanup_api_key
+    end
+  end
+
+  desc "Setup development environment"
+  lane :setup do
+    # Install CocoaPods dependencies
+    cocoapods(clean_install: true)
+    
+    # Try to setup certificates and provisioning profiles
+    begin
+      UI.message("Setting up certificates and provisioning profiles...")
+      match(type: "development", readonly: true)
+      match(type: "appstore", readonly: true)
+    rescue => ex
+      UI.important("⚠️  Certificate management (match) not configured: #{ex.message}")
+      UI.important("💡 To setup automated certificate management:")
+      UI.important("   1. Create a private git repository for certificates")
+      UI.important("   2. Run: bundle exec fastlane match init")
+      UI.important("   3. Follow the prompts to configure the repository")
+      UI.important("💡 For now, ensure you have valid certificates in Xcode")
+    end
+  end
+
+  desc "Test App Store Connect API connection"
+  lane :test_api do
+    begin
+      # Configure API key
+      api_key = configure_api_key
+      if api_key != nil
+        UI.success("✅ App Store Connect API connection successful!")
+        UI.message("API Key ID: #{ENV['APP_STORE_CONNECT_API_KEY_ID']}")
+        UI.message("Issuer ID: #{ENV['APP_STORE_CONNECT_ISSUER_ID']}")
+      else
+        UI.error("❌ Failed to configure API key")
+        raise "API configuration failed"
+      end
+    rescue => ex
+      UI.error("❌ App Store Connect API connection failed: #{ex.message}")
+      raise ex
+    ensure
+      cleanup_api_key
+    end
+  end
+
+  desc "Test build without uploading (local certificates)"
+  lane :test_build do
+    begin
+      UI.message("🔨 Testing local build process...")
+      
+      # Install/update CocoaPods dependencies
+      cocoapods(clean_install: false)
+      
+      # Try to build without match - uses local certificates
+      build_ios_app(
+        workspace: WORKSPACE,
+        scheme: SCHEME,
+        configuration: "Release",
+        clean: true,
+        export_method: "app-store",
+        output_directory: "./build",
+        output_name: "Runner-test.ipa",
+        skip_codesigning: false
+      )
+      
+      UI.success("✅ Build completed successfully!")
+      UI.message("📦 Test build saved as: ./build/Runner-test.ipa")
+      
+    rescue => ex
+      UI.error("❌ Build failed: #{ex.message}")
+      UI.important("💡 This might be due to missing certificates or provisioning profiles")
+      UI.important("💡 Make sure you have valid certificates installed in Xcode")
+      raise ex
+    end
+  end
+
+  desc "Run tests"
+  lane :test do
+    scan(
+      workspace: WORKSPACE,
+      scheme: SCHEME,
+      clean: true
+    )
+  end
+
+  desc "Build the app for release"
+  lane :build_release do |options|
+    # Install/update CocoaPods dependencies
+    cocoapods(clean_install: false)
+    
+    # Build Flutter app first to ensure latest version is used
+    Dir.chdir("..") do
+      sh("flutter", "build", "ios", "--release", "--no-codesign")
+    end
+    
+    # Increment build number
+    increment_build_number(
+      xcodeproj: "Runner.xcodeproj"
+    )
+    
+    # Build the app
+    build_ios_app(
+      workspace: WORKSPACE,
+      scheme: SCHEME,
+      configuration: "Release",
+      clean: true,
+      export_method: "app-store",
+      output_directory: "./build",
+      output_name: "Runner.ipa"
+    )
+  end
+
+  desc "Upload to TestFlight"
+  lane :testflight_upload do |options|
+    # Use the API key configured in the calling lane
+    if @api_key == nil
+      # Configure API key if not already configured
+      @api_key = configure_api_key
+      if @api_key == nil
+        UI.error("Failed to configure API key")
+        raise "API configuration failed"
+      end
+    end
+    
+    # Upload to TestFlight
+    upload_to_testflight(
+      ipa: "./build/Runner.ipa",
+      skip_waiting_for_build_processing: options[:skip_waiting_for_build_processing] || false,
+      changelog: options[:changelog] || "Automated build from CI/CD",
+      distribute_external: false,
+      notify_external_testers: false,
+      api_key: @api_key
+    )
+    
+    # Send notification
+    slack(
+      message: "✅ New RMAC MultiTimer build uploaded to TestFlight!",
+      success: true
+    ) if ENV["SLACK_URL"]
+  end
+
+  desc "Upload to App Store"
+  lane :appstore_upload do |options|
+    # Use the API key configured in the calling lane
+    if @api_key == nil
+      # Configure API key if not already configured
+      @api_key = configure_api_key
+      if @api_key == nil
+        UI.error("Failed to configure API key")
+        raise "API configuration failed"
+      end
+    end
+    
+    # Upload to App Store with API key
+    upload_to_app_store(
+      api_key: @api_key,
+      ipa: "./build/Runner.ipa",
+      submit_for_review: options[:submit_for_review] || false,
+      automatic_release: options[:automatic_release] || false,
+      force: options[:force] || false,
+      skip_metadata: false,
+      skip_screenshots: true,
+      precheck_include_in_app_purchases: false, # Skip in-app purchase check for API key
+      submission_information: options[:submission_information] || {},
+      release_notes: {
+        "en-US" => options[:release_notes] || "Bug fixes and performance improvements"
+      }
+    )
+    
+    # Send notification
+    slack(
+      message: "🚀 RMAC MultiTimer submitted to App Store for review!",
+      success: true
+    ) if ENV["SLACK_URL"]
+  end
+
+  desc "Deploy to TestFlight (build + upload)"
+  lane :deploy_testflight do |options|
+    begin
+      # Configure API key
+      @api_key = configure_api_key
+      if @api_key == nil
+        UI.error("Failed to configure API key")
+        raise "API configuration failed"
+      end
+      
+      # Try to setup certificates, but don't fail if match isn't configured
+      begin
+        UI.message("Setting up certificates and provisioning profiles...")
+        match(type: "appstore", readonly: true, api_key: @api_key)
+      rescue => ex
+        UI.important("⚠️  Certificate management (match) not configured: #{ex.message}")
+        UI.important("💡 You can still build if you have certificates installed manually in Xcode")
+        UI.important("💡 Or setup match later with: bundle exec fastlane match init")
+      end
+      
+      # Build the app
+      build_release(skip_waiting_for_build_processing: true)
+      
+      # Upload to TestFlight
+      testflight_upload(
+        changelog: options[:changelog] || "Automated release",
+        skip_waiting_for_build_processing: true
+      )
+    ensure
+      cleanup_api_key
+    end
+  end
+
+  desc "Deploy to App Store (build + upload + submit)"
+  lane :deploy_appstore do |options|
+    begin
+      # Configure API key
+      @api_key = configure_api_key
+      if @api_key == nil
+        UI.error("Failed to configure API key")
+        raise "API configuration failed"
+      end
+      
+      # Try to setup certificates, but don't fail if match isn't configured
+      begin
+        UI.message("Setting up certificates and provisioning profiles...")
+        match(type: "appstore", readonly: true, api_key: @api_key)
+      rescue => ex
+        UI.important("⚠️  Certificate management (match) not configured: #{ex.message}")
+        UI.important("💡 You can still build if you have certificates installed manually in Xcode")
+        UI.important("💡 Or setup match later with: bundle exec fastlane match init")
+      end
+      
+      # Build the app
+      build_release
+      
+      # Upload and submit to App Store
+      appstore_upload(
+        submit_for_review: true,
+        automatic_release: false,
+        force: true,
+        release_notes: options[:release_notes] || "Bug fixes and performance improvements"
+      )
+    ensure
+      cleanup_api_key
+    end
+  end
+
+  desc "Deploy to App Store (skip precheck entirely)"
+  lane :deploy_appstore_no_precheck do |options|
+    # Use the API key configured in the calling lane
+    if @api_key == nil
+      # Configure API key if not already configured
+      @api_key = configure_api_key
+      if @api_key == nil
+        UI.error("Failed to configure API key")
+        raise "API configuration failed"
+      end
+    end
+    
+    # Upload to App Store with API key, completely skip precheck
+    upload_to_app_store(
+      api_key: @api_key,
+      ipa: "./build/Runner.ipa",
+      submit_for_review: options[:submit_for_review] || false,
+      automatic_release: options[:automatic_release] || false,
+      force: options[:force] || false,
+      skip_metadata: false,
+      skip_screenshots: true,
+      skip_app_version_update: false,
+      skip_binary_upload: false,
+      run_precheck_before_submit: false, # Completely skip precheck
+      submission_information: options[:submission_information] || {},
+      release_notes: {
+        "en-US" => options[:release_notes] || "Bug fixes and performance improvements"
+      }
+    )
+    
+    # Send notification
+    slack(
+      message: "🚀 RMAC MultiTimer submitted to App Store for review! (precheck skipped)",
+      success: true
+    ) if ENV["SLACK_URL"]
+  end
+
+  desc "Setup certificates and provisioning profiles"
+  lane :certificates do
+    match(type: "development")
+    match(type: "appstore")
+  end
+
+  desc "Refresh certificates and provisioning profiles"
+  lane :refresh_certificates do
+    match(type: "development", force_for_new_devices: true)
+    match(type: "appstore", force_for_new_devices: true)
+  end
+
+  # Error handling
+  error do |lane, exception|
+    slack(
+      message: "❌ RMAC MultiTimer iOS deployment failed in lane '#{lane}': #{exception.message}",
+      success: false
+    ) if ENV["SLACK_URL"]
+  end
+
+end

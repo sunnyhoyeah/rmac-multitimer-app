@@ -1,0 +1,7 @@
+app_identifier("com.example.multitimerTrackfield")
+
+# When using App Store Connect API Keys, don't specify apple_id, itc_team_id, or team_id here
+# The API key authentication is handled in the Fastfile
+
+# For more information about the Appfile, see:
+#     https://docs.fastlane.tools/advanced/#appfile
