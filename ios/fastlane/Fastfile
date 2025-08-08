@@ -302,53 +302,14 @@ platform :ios do
     # Increment build number
     increment_build_number(
       xcodeproj: "Runner.xcodeproj"
-    )
-    
-    # Create App Store distribution certificate (if needed)
-    UI.message("🔍 Setting up App Store distribution certificate...")
-    begin
-      cert(
-        api_key: api_key,
-        development: false,  # Make sure it's distribution certificate
-        output_path: "./build"
-      )
-    rescue => e
-      UI.important("⚠️  Certificate creation skipped: #{e.message}")
-      if e.message.include?("reached the maximum number")
-        UI.message("Using existing certificates...")
-      else
-        raise e
-      end
-    end
-    
-    # Create App Store provisioning profile
-    UI.message("🔍 Setting up App Store provisioning profile...")
-    profile = sigh(
-      api_key: api_key,
-      app_identifier: APP_IDENTIFIER,
-      development: false,  # Make sure it's App Store profile
-      output_path: "./build"
-    )
-    
-    UI.message("✅ Provisioning profile created/found: #{profile}")
-    UI.message("Profile name: #{lane_context[SharedValues::SIGH_NAME]}")
-    UI.message("Profile UUID: #{lane_context[SharedValues::SIGH_UUID]}")
-    
-    # Create the API key file path for xcodebuild
+    )    # Create the API key file path for xcodebuild
     api_key_file = "AuthKey_#{ENV['APP_STORE_CONNECT_API_KEY_ID']}.p8"
     api_key_path = File.expand_path(api_key_file)
+
+    # Use automatic provisioning with API key authentication
+    UI.message("� Using automatic provisioning with API key authentication...")
     
-    # Set manual signing for Release configuration
-    UI.message("🔧 Configuring manual signing for Release configuration...")
-    update_project_provisioning(
-      xcodeproj: "Runner.xcodeproj",
-      profile: profile,
-      target_filter: "Runner",
-      build_configuration: "Release",
-      code_signing_identity: "iPhone Distribution"
-    )
-    
-    # Build with explicit provisioning profile UUID
+    # Build with automatic provisioning and API key authentication
     build_ios_app(
       workspace: WORKSPACE,
       scheme: SCHEME,
@@ -357,15 +318,9 @@ platform :ios do
       export_method: "app-store",
       output_directory: "./build",
       output_name: "Runner.ipa",
-      # Use explicit export options to force App Store distribution
-      export_options: {
-        method: "app-store",
-        provisioningProfiles: {
-          APP_IDENTIFIER => lane_context[SharedValues::SIGH_UUID]
-        }
-      },
-      # Don't use allowProvisioningUpdates since we're manually configuring
+      # Use API key authentication with automatic provisioning
       xcargs: [
+        "-allowProvisioningUpdates",
         "-authenticationKeyPath '#{api_key_path}'",
         "-authenticationKeyID #{ENV['APP_STORE_CONNECT_API_KEY_ID']}",
         "-authenticationKeyIssuerID #{ENV['APP_STORE_CONNECT_ISSUER_ID']}"
