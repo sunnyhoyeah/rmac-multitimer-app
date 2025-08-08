@@ -15,6 +15,14 @@ For _fastlane_ installation instructions, see [Installing _fastlane_](https://do
 
 ## iOS
 
+### ios test_api_key
+
+```sh
+[bundle exec] fastlane ios test_api_key
+```
+
+Test API key configuration
+
 ### ios check_app
 
 ```sh
@@ -62,6 +70,14 @@ Run tests
 ```
 
 Build the app for release
+
+### ios build_release_api_auth
+
+```sh
+[bundle exec] fastlane ios build_release_api_auth
+```
+
+Build the app for release with API key authentication
 
 ### ios testflight_upload
 

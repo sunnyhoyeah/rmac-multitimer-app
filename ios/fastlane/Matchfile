@@ -3,7 +3,7 @@ git_url("") # Your certificates repository URL
 storage_mode("git")
 
 type("development") # The default type, can be: appstore, adhoc, development, enterprise
-app_identifier(["com.rmac.multitimer"])
+app_identifier(["com.example.multitimerTrackfield"])
 
 # For all available options run `fastlane match --help`
 # Remove the # in the beginning of the line, to enable the other options
