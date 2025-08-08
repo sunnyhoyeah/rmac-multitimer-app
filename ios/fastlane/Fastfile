@@ -282,8 +282,8 @@ platform :ios do
     )
   end
 
-  desc "Build the app for release using automatic provisioning"
-  lane :build_release_auto_provision do |options|
+  desc "Build the app for release with API key authentication"
+  lane :build_release_api_auth do |options|
     # Install/update CocoaPods dependencies
     cocoapods(clean_install: false)
     
@@ -297,7 +297,10 @@ platform :ios do
       xcodeproj: "Runner.xcodeproj"
     )
     
-    # Build the app with automatic provisioning
+    # Create the API key file path for xcodebuild
+    api_key_path = File.expand_path("AuthKey_#{ENV['APP_STORE_CONNECT_API_KEY_ID']}.p8")
+    
+    # Build with App Store Connect API authentication
     build_ios_app(
       workspace: WORKSPACE,
       scheme: SCHEME,
@@ -306,15 +309,13 @@ platform :ios do
       export_method: "app-store",
       output_directory: "./build",
       output_name: "Runner.ipa",
-      xcargs: "-allowProvisioningUpdates",
-      # Use automatic provisioning
-      export_options: {
-        method: "app-store",
-        signingStyle: "automatic",
-        uploadBitcode: false,
-        uploadSymbols: true,
-        compileBitcode: false
-      }
+      # Use API key for authentication and provisioning
+      xcargs: [
+        "-allowProvisioningUpdates",
+        "-authenticationKeyPath '#{api_key_path}'",
+        "-authenticationKeyID #{ENV['APP_STORE_CONNECT_API_KEY_ID']}",
+        "-authenticationKeyIssuerID #{ENV['APP_STORE_CONNECT_ISSUER_ID']}"
+      ].join(" ")
     )
   end
 
@@ -462,8 +463,8 @@ platform :ios do
       end
     end
     
-    # Build the app using automatic provisioning (skip match entirely)
-    build_release_auto_provision
+    # Build the app using API key authentication
+    build_release_api_auth
     
     # Upload to App Store with API key, completely skip precheck
     upload_to_app_store(
