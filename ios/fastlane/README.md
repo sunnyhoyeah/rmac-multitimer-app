@@ -135,6 +135,14 @@ Setup certificates and provisioning profiles
 
 Refresh certificates and provisioning profiles
 
+### ios test_certificates
+
+```sh
+[bundle exec] fastlane ios test_certificates
+```
+
+Test certificate creation with API key
+
 ----
 
 This README.md is auto-generated and will be re-generated every time [_fastlane_](https://fastlane.tools) is run.

@@ -284,6 +284,13 @@ platform :ios do
 
   desc "Build the app for release with API key authentication"
   lane :build_release_api_auth do |options|
+    # Configure API key first
+    api_key = configure_api_key
+    if api_key == nil
+      UI.error("Failed to configure API key")
+      raise "API configuration failed"
+    end
+    
     # Install/update CocoaPods dependencies
     cocoapods(clean_install: false)
     
@@ -297,8 +304,19 @@ platform :ios do
       xcodeproj: "Runner.xcodeproj"
     )
     
-    # Create the API key file path for xcodebuild
-    api_key_path = File.expand_path("AuthKey_#{ENV['APP_STORE_CONNECT_API_KEY_ID']}.p8")
+    # Create certificates and provisioning profiles first
+    UI.message("Creating App Store distribution certificate...")
+    cert(
+      api_key: api_key,
+      output_path: "./build"
+    )
+    
+    UI.message("Creating App Store provisioning profile...")
+    sigh(
+      api_key: api_key,
+      app_identifier: APP_IDENTIFIER,
+      output_path: "./build"
+    )
     
     # Build with App Store Connect API authentication
     build_ios_app(
@@ -309,13 +327,8 @@ platform :ios do
       export_method: "app-store",
       output_directory: "./build",
       output_name: "Runner.ipa",
-      # Use API key for authentication and provisioning
-      xcargs: [
-        "-allowProvisioningUpdates",
-        "-authenticationKeyPath '#{api_key_path}'",
-        "-authenticationKeyID #{ENV['APP_STORE_CONNECT_API_KEY_ID']}",
-        "-authenticationKeyIssuerID #{ENV['APP_STORE_CONNECT_ISSUER_ID']}"
-      ].join(" ")
+      # Use API key for authentication and allow provisioning updates
+      xcargs: "-allowProvisioningUpdates"
     )
   end
 
@@ -501,6 +514,42 @@ platform :ios do
   lane :refresh_certificates do
     match(type: "development", force_for_new_devices: true)
     match(type: "appstore", force_for_new_devices: true)
+  end
+
+  desc "Test certificate creation with API key"
+  lane :test_certificates do
+    begin
+      # Configure API key
+      @api_key = configure_api_key
+      if @api_key == nil
+        UI.error("Failed to configure API key")
+        raise "API configuration failed"
+      end
+      
+      UI.message("🔍 Testing certificate and provisioning profile creation...")
+      
+      # Test creating/fetching App Store distribution certificate
+      cert(
+        api_key: @api_key,
+        output_path: "./build"
+      )
+      
+      # Test creating/fetching App Store provisioning profile
+      sigh(
+        api_key: @api_key,
+        app_identifier: APP_IDENTIFIER,
+        output_path: "./build"
+      )
+      
+      UI.success("✅ Certificate and provisioning profile operations completed!")
+      
+    rescue => error
+      UI.error("❌ Certificate test failed: #{error.message}")
+      UI.error("Error class: #{error.class}")
+      UI.error("Full error: #{error.backtrace.first(5).join('\n')}")
+    ensure
+      cleanup_api_key
+    end
   end
 
   # Error handling
