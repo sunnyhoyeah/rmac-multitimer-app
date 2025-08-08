@@ -277,7 +277,8 @@ platform :ios do
       clean: true,
       export_method: "app-store",
       output_directory: "./build",
-      output_name: "Runner.ipa"
+      output_name: "Runner.ipa",
+      xcargs: "-allowProvisioningUpdates"
     )
   end
 
