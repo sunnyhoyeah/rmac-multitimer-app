@@ -312,13 +312,20 @@ platform :ios do
     )
     
     UI.message("Creating App Store provisioning profile...")
-    sigh(
+    profile = sigh(
       api_key: api_key,
       app_identifier: APP_IDENTIFIER,
       output_path: "./build"
     )
     
+    UI.message("🔍 Provisioning profile created: #{profile}")
+    UI.message("Profile name: #{lane_context[SharedValues::SIGH_NAME]}")
+    UI.message("Profile UUID: #{lane_context[SharedValues::SIGH_UUID]}")
+    
     # Build with App Store Connect API authentication
+    profile_uuid = lane_context[SharedValues::SIGH_UUID]
+    UI.message("🔍 Using provisioning profile UUID: #{profile_uuid}")
+    
     build_ios_app(
       workspace: WORKSPACE,
       scheme: SCHEME,
@@ -327,8 +334,15 @@ platform :ios do
       export_method: "app-store",
       output_directory: "./build",
       output_name: "Runner.ipa",
-      # Use API key for authentication and allow provisioning updates
-      xcargs: "-allowProvisioningUpdates"
+      # Use the provisioning profile we just created
+      export_options: {
+        method: "app-store",
+        provisioningProfiles: {
+          APP_IDENTIFIER => lane_context[SharedValues::SIGH_NAME]
+        }
+      },
+      # Set the provisioning profile name explicitly for manual signing
+      xcargs: "-allowProvisioningUpdates CODE_SIGN_STYLE=Manual PROVISIONING_PROFILE_SPECIFIER='#{lane_context[SharedValues::SIGH_NAME]}'"
     )
   end
 
