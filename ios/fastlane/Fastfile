@@ -425,6 +425,9 @@ platform :ios do
       end
     end
     
+    # Build the app
+    build_release
+    
     # Upload to App Store with API key, completely skip precheck
     upload_to_app_store(
       api_key: @api_key,
