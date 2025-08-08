@@ -168,6 +168,12 @@ jobs:
         bundle exec fastlane setup || echo "Certificate setup failed, using manual certificates"
 
     - name: Build and deploy iOS app
+      env:
+        APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+        APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+        APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        FASTLANE_USER: ${{ secrets.FASTLANE_USER }}
+        FASTLANE_PASSWORD: ${{ secrets.FASTLANE_PASSWORD }}
       run: |
         cd ios
         
@@ -177,8 +183,11 @@ jobs:
         bundle --version
         bundle list || echo "Bundle list failed"
         
-        # Source environment variables
-        source ~/.appstore_connect_env
+        # Debug: Check environment variables (without exposing secrets)
+        echo "Environment variables configured:"
+        echo "APP_STORE_CONNECT_API_KEY_ID: ${APP_STORE_CONNECT_API_KEY_ID:+SET}"
+        echo "APP_STORE_CONNECT_ISSUER_ID: ${APP_STORE_CONNECT_ISSUER_ID:+SET}"
+        echo "APP_STORE_CONNECT_API_KEY: ${APP_STORE_CONNECT_API_KEY:+SET}"
         
         # Determine deployment type
         DEPLOYMENT_TYPE="${{ needs.determine-deployment.outputs.deployment_type }}"

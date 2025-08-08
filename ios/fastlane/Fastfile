@@ -16,7 +16,34 @@ def configure_api_key
     begin
       # Create API key file from base64 encoded content
       api_key_file = "AuthKey_#{ENV['APP_STORE_CONNECT_API_KEY_ID']}.p8"
-      File.write(api_key_file, Base64.decode64(ENV["APP_STORE_CONNECT_API_KEY"]))
+      
+      # Check if file already exists (from GitHub Actions step)
+      unless File.exist?(api_key_file)
+        UI.message("Creating API key file: #{api_key_file}")
+        File.write(api_key_file, Base64.decode64(ENV["APP_STORE_CONNECT_API_KEY"]))
+      else
+        UI.message("Using existing API key file: #{api_key_file}")
+      end
+      
+      # Validate the API key file exists and has content
+      unless File.exist?(api_key_file) && File.size(api_key_file) > 0
+        UI.error("API key file is missing or empty: #{api_key_file}")
+        return nil
+      end
+      
+      # Read and validate the API key content
+      key_content = File.read(api_key_file)
+      unless key_content.include?("BEGIN PRIVATE KEY") || key_content.include?("BEGIN EC PRIVATE KEY")
+        UI.error("API key file does not contain valid private key format")
+        UI.error("Key content preview: #{key_content[0..100]}...")
+        return nil
+      end
+      
+      UI.message("API key file validated, configuring App Store Connect API...")
+      UI.message("Key ID: #{ENV['APP_STORE_CONNECT_API_KEY_ID']}")
+      UI.message("Issuer ID: #{ENV['APP_STORE_CONNECT_ISSUER_ID']}")
+      UI.message("Key file path: #{File.expand_path(api_key_file)}")
+      UI.message("Key file size: #{File.size(api_key_file)} bytes")
       
       # Configure the API key and return the key object
       @api_key = app_store_connect_api_key(
@@ -34,6 +61,15 @@ def configure_api_key
       return @api_key
     rescue => error
       UI.error("Failed to configure API key: #{error.message}")
+      UI.error("Error class: #{error.class}")
+      if error.message.include?("invalid curve name")
+        UI.error("❌ 'Invalid curve name' error suggests:")
+        UI.error("   1. API Key ID mismatch - Current: #{ENV['APP_STORE_CONNECT_API_KEY_ID']}")
+        UI.error("   2. Corrupted API key content in GitHub Secrets")
+        UI.error("   3. Incorrect Issuer ID - Current: #{ENV['APP_STORE_CONNECT_ISSUER_ID']}")
+        UI.error("💡 Expected Key IDs: 5GQ446J4X4 or LX4RW29VFH")
+      end
+      UI.error("Error details: #{error.backtrace.first(5).join('\n')}")
       return nil
     end
   else
@@ -55,6 +91,48 @@ def cleanup_api_key
 end
 
 platform :ios do
+  
+  desc "Test API key configuration"
+  lane :test_api_key do
+    begin
+      UI.message("🔍 Testing API key configuration...")
+      
+      # Check environment variables
+      missing_vars = []
+      missing_vars << "APP_STORE_CONNECT_API_KEY_ID" unless ENV["APP_STORE_CONNECT_API_KEY_ID"]
+      missing_vars << "APP_STORE_CONNECT_ISSUER_ID" unless ENV["APP_STORE_CONNECT_ISSUER_ID"]
+      missing_vars << "APP_STORE_CONNECT_API_KEY" unless ENV["APP_STORE_CONNECT_API_KEY"]
+      
+      if missing_vars.any?
+        UI.error("❌ Missing environment variables: #{missing_vars.join(', ')}")
+        return
+      end
+      
+      UI.success("✅ All required environment variables are set")
+      UI.message("Key ID: #{ENV['APP_STORE_CONNECT_API_KEY_ID']}")
+      UI.message("Issuer ID: #{ENV['APP_STORE_CONNECT_ISSUER_ID']}")
+      
+      # Test API key configuration
+      api_key = configure_api_key
+      if api_key
+        UI.success("✅ API key configuration successful!")
+        UI.message("Testing API connection...")
+        
+        # Test the connection by trying to list apps
+        apps = Spaceship::ConnectAPI::App.all(api_key: api_key)
+        UI.success("✅ Successfully connected to App Store Connect")
+        UI.message("Found #{apps.count} apps in your account")
+      else
+        UI.error("❌ API key configuration failed")
+      end
+    rescue => error
+      UI.error("❌ API key test failed: #{error.message}")
+      UI.error("Error class: #{error.class}")
+      UI.error("Full error: #{error.backtrace.first(5).join('\n')}")
+    ensure
+      cleanup_api_key
+    end
+  end
   
   desc "Check if app exists in App Store Connect"
   lane :check_app do
