@@ -282,6 +282,42 @@ platform :ios do
     )
   end
 
+  desc "Build the app for release using automatic provisioning"
+  lane :build_release_auto_provision do |options|
+    # Install/update CocoaPods dependencies
+    cocoapods(clean_install: false)
+    
+    # Build Flutter app first to ensure latest version is used
+    Dir.chdir("..") do
+      sh("flutter", "build", "ios", "--release", "--no-codesign")
+    end
+    
+    # Increment build number
+    increment_build_number(
+      xcodeproj: "Runner.xcodeproj"
+    )
+    
+    # Build the app with automatic provisioning
+    build_ios_app(
+      workspace: WORKSPACE,
+      scheme: SCHEME,
+      configuration: "Release",
+      clean: true,
+      export_method: "app-store",
+      output_directory: "./build",
+      output_name: "Runner.ipa",
+      xcargs: "-allowProvisioningUpdates",
+      # Use automatic provisioning
+      export_options: {
+        method: "app-store",
+        signingStyle: "automatic",
+        uploadBitcode: false,
+        uploadSymbols: true,
+        compileBitcode: false
+      }
+    )
+  end
+
   desc "Upload to TestFlight"
   lane :testflight_upload do |options|
     # Use the API key configured in the calling lane
@@ -426,8 +462,8 @@ platform :ios do
       end
     end
     
-    # Build the app
-    build_release
+    # Build the app using automatic provisioning (skip match entirely)
+    build_release_auto_provision
     
     # Upload to App Store with API key, completely skip precheck
     upload_to_app_store(
