@@ -29,10 +29,12 @@ You need to configure exactly these 3 secrets in your GitHub repository:
 ### 3. `APP_STORE_CONNECT_API_KEY`
 **Value:** Base64 encoded content of the corresponding API key file
 
-#### For Key ID `5GQ446J4X4`:
+#### For Key ID `5GQ446J4X4` (UPDATED - 2025-08-08):
 ```
 LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1JR1RBZ0VBTUJNR0J5cUdTTTQ5QWdFR0NDcUdTTTQ5QXdFSEJIa3dkd0lCQVFRZ1N2cEhsS1BLdmd6UTB6UjcKZCtlT0x2NTV6ZTB0dWEyOWk3V01hYndHSjZ1Z0NnWUlLb1pJemowREFRZWhSQU5DQUFSblpOV0s5WHhEbys2YwpRdGloSnZTb1o1dUlqY2QwaS9oODBnSDV2UkhsNGdramF6QkttQ3pTTWRuRHMyaE13MDBSbk1RVFhyVjByTEFlCkNlZUxYMXpjCi0tLS0tRU5EIFBSSVZBVEUgS0VZLS0tLS0=
 ```
+
+> **⚠️ IMPORTANT**: This is the corrected base64 string generated on August 8, 2025. If the deployment still fails with "invalid private key format", you need to update your GitHub Secret `APP_STORE_CONNECT_API_KEY` with this exact value.
 
 #### For Key ID `LX4RW29VFH`:
 ```
