@@ -351,14 +351,41 @@ platform :ios do
     # Increment build number
     increment_build_number(
       xcodeproj: "Runner.xcodeproj"
-    )    # Create the API key file path for xcodebuild
-    api_key_file = "AuthKey_#{ENV['APP_STORE_CONNECT_API_KEY_ID']}.p8"
-    api_key_path = File.expand_path(api_key_file)
-
-    # Use automatic provisioning with API key authentication
-    UI.message("� Using automatic provisioning with API key authentication...")
+    )
     
-    # Build with automatic provisioning and API key authentication
+    # Create distribution certificate and provisioning profile
+    UI.message("🔐 Creating distribution certificate and provisioning profile...")
+    
+    begin
+      # Create distribution certificate
+      cert(
+        api_key: api_key,
+        team_id: "78MY3LW536",
+        development: false,  # Distribution certificate
+        force: false  # Don't create if already exists
+      )
+      
+      # Create distribution provisioning profile  
+      provisioning_profile = sigh(
+        api_key: api_key,
+        app_identifier: APP_IDENTIFIER,
+        team_id: "78MY3LW536",
+        adhoc: false,  # App Store distribution
+        development: false,  # App Store distribution
+        force: false  # Don't create if already exists
+      )
+      
+      UI.success("✅ Certificate and provisioning profile ready")
+      UI.message("Profile UUID: #{provisioning_profile}")
+      
+    rescue => error
+      UI.error("❌ Failed to create certificates/profiles: #{error.message}")
+      raise "Certificate setup failed"
+    end
+
+    # Build with manual signing using the created provisioning profile
+    UI.message("🔨 Building with manual signing...")
+    
     build_ios_app(
       workspace: WORKSPACE,
       scheme: SCHEME,
@@ -367,18 +394,13 @@ platform :ios do
       export_method: "app-store",
       output_directory: "./build",
       output_name: "Runner.ipa",
-      # Use API key authentication with automatic provisioning
-      xcargs: [
-        "-allowProvisioningUpdates",
-        "-authenticationKeyPath '#{api_key_path}'",
-        "-authenticationKeyID #{ENV['APP_STORE_CONNECT_API_KEY_ID']}",
-        "-authenticationKeyIssuerID #{ENV['APP_STORE_CONNECT_ISSUER_ID']}"
-      ].join(" "),
-      # Export options to ensure App Store distribution signing
       export_options: {
         method: "app-store",
-        teamID: "78MY3LW536",  # Our Apple Developer Team ID
-        signingStyle: "automatic",
+        teamID: "78MY3LW536",
+        signingStyle: "manual",
+        provisioningProfiles: {
+          APP_IDENTIFIER => provisioning_profile
+        },
         uploadBitcode: false,
         uploadSymbols: true,
         manageAppVersionAndBuildNumber: false
