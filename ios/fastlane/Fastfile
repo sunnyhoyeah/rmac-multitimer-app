@@ -11,40 +11,7 @@ WORKSPACE = "Runner.xcworkspace"
 SCHEME = "Runner"
 
 # Configure App Store Connect API Key
-def c    # Increment build number
-    increment_build_number(
-      xcodeproj: "Runner.xcodeproj"
-    )
-    
-    # Create the API key file path for xcodebuild
-    api_key_file = "AuthKey_#{ENV['APP_STORE_CONNECT_API_KEY_ID']}.p8"
-    api_key_path = File.expand_path(api_key_file)
-
-    # Create distribution certificate and provisioning profile before build
-    UI.message("📱 Creating App Store distribution certificate and provisioning profile...")
-    
-    begin
-      # Create distribution certificate
-      cert(
-        api_key: api_key,
-        type: "distribution"
-      )
-      
-      # Create App Store provisioning profile
-      sigh(
-        api_key: api_key,
-        app_identifier: APP_IDENTIFIER,
-        force: true,
-        readonly: false
-      )
-      
-      UI.success("✅ Successfully created distribution certificate and provisioning profile")
-    rescue => e
-      UI.important("⚠️  Certificate/profile creation failed: #{e.message}")
-      UI.important("Continuing with automatic provisioning...")
-    end
-
-    # Build with automatic provisioning and API key authenticationi_key
+def configure_app_store_connect_api_key
   if ENV["APP_STORE_CONNECT_API_KEY_ID"] && ENV["APP_STORE_CONNECT_ISSUER_ID"] && ENV["APP_STORE_CONNECT_API_KEY"]
     begin
       # Create API key file from base64 encoded content
@@ -146,8 +113,22 @@ platform :ios do
       UI.message("Issuer ID: #{ENV['APP_STORE_CONNECT_ISSUER_ID']}")
       
       # Test API key configuration
-      api_key = configure_api_key
-      if api_key
+      begin
+        # Create API key file from base64 encoded content
+        api_key_file = "AuthKey_#{ENV['APP_STORE_CONNECT_API_KEY_ID']}.p8"
+        
+        unless File.exist?(api_key_file)
+          File.write(api_key_file, Base64.decode64(ENV["APP_STORE_CONNECT_API_KEY"]))
+        end
+        
+        api_key = app_store_connect_api_key(
+          key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
+          issuer_id: ENV["APP_STORE_CONNECT_ISSUER_ID"],
+          key_filepath: File.expand_path(api_key_file),
+          duration: 1200,
+          in_house: false
+        )
+        
         UI.success("✅ API key configuration successful!")
         UI.message("Testing API connection...")
         
@@ -155,8 +136,8 @@ platform :ios do
         apps = Spaceship::ConnectAPI::App.all(api_key: api_key)
         UI.success("✅ Successfully connected to App Store Connect")
         UI.message("Found #{apps.count} apps in your account")
-      else
-        UI.error("❌ API key configuration failed")
+      rescue => error
+        UI.error("❌ API key configuration failed: #{error.message}")
       end
     rescue => error
       UI.error("❌ API key test failed: #{error.message}")
@@ -170,9 +151,23 @@ platform :ios do
   desc "Check if app exists in App Store Connect"
   lane :check_app do
     # Configure API key
-    @api_key = configure_api_key
-    if @api_key == nil
-      UI.error("Failed to configure API key")
+    begin
+      # Create API key file from base64 encoded content
+      api_key_file = "AuthKey_#{ENV['APP_STORE_CONNECT_API_KEY_ID']}.p8"
+      
+      unless File.exist?(api_key_file)
+        File.write(api_key_file, Base64.decode64(ENV["APP_STORE_CONNECT_API_KEY"]))
+      end
+      
+      @api_key = app_store_connect_api_key(
+        key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
+        issuer_id: ENV["APP_STORE_CONNECT_ISSUER_ID"],
+        key_filepath: File.expand_path(api_key_file),
+        duration: 1200,
+        in_house: false
+      )
+    rescue => error
+      UI.error("Failed to configure API key: #{error.message}")
       raise "API configuration failed"
     end
     
@@ -230,15 +225,23 @@ platform :ios do
   lane :test_api do
     begin
       # Configure API key
-      api_key = configure_api_key
-      if api_key != nil
-        UI.success("✅ App Store Connect API connection successful!")
-        UI.message("API Key ID: #{ENV['APP_STORE_CONNECT_API_KEY_ID']}")
-        UI.message("Issuer ID: #{ENV['APP_STORE_CONNECT_ISSUER_ID']}")
-      else
-        UI.error("❌ Failed to configure API key")
-        raise "API configuration failed"
+      api_key_file = "AuthKey_#{ENV['APP_STORE_CONNECT_API_KEY_ID']}.p8"
+      
+      unless File.exist?(api_key_file)
+        File.write(api_key_file, Base64.decode64(ENV["APP_STORE_CONNECT_API_KEY"]))
       end
+      
+      api_key = app_store_connect_api_key(
+        key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
+        issuer_id: ENV["APP_STORE_CONNECT_ISSUER_ID"],
+        key_filepath: File.expand_path(api_key_file),
+        duration: 1200,
+        in_house: false
+      )
+      
+      UI.success("✅ App Store Connect API connection successful!")
+      UI.message("API Key ID: #{ENV['APP_STORE_CONNECT_API_KEY_ID']}")
+      UI.message("Issuer ID: #{ENV['APP_STORE_CONNECT_ISSUER_ID']}")
     rescue => ex
       UI.error("❌ App Store Connect API connection failed: #{ex.message}")
       raise ex
@@ -318,9 +321,22 @@ platform :ios do
   desc "Build the app for release with API key authentication"
   lane :build_release_api_auth do |options|
     # Configure API key first
-    api_key = configure_api_key
-    if api_key == nil
-      UI.error("Failed to configure API key")
+    begin
+      api_key_file = "AuthKey_#{ENV['APP_STORE_CONNECT_API_KEY_ID']}.p8"
+      
+      unless File.exist?(api_key_file)
+        File.write(api_key_file, Base64.decode64(ENV["APP_STORE_CONNECT_API_KEY"]))
+      end
+      
+      api_key = app_store_connect_api_key(
+        key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
+        issuer_id: ENV["APP_STORE_CONNECT_ISSUER_ID"],
+        key_filepath: File.expand_path(api_key_file),
+        duration: 1200,
+        in_house: false
+      )
+    rescue => error
+      UI.error("Failed to configure API key: #{error.message}")
       raise "API configuration failed"
     end
     
@@ -372,12 +388,24 @@ platform :ios do
 
   desc "Upload to TestFlight"
   lane :testflight_upload do |options|
-    # Use the API key configured in the calling lane
+    # Configure API key if not already configured
     if @api_key == nil
-      # Configure API key if not already configured
-      @api_key = configure_api_key
-      if @api_key == nil
-        UI.error("Failed to configure API key")
+      begin
+        api_key_file = "AuthKey_#{ENV['APP_STORE_CONNECT_API_KEY_ID']}.p8"
+        
+        unless File.exist?(api_key_file)
+          File.write(api_key_file, Base64.decode64(ENV["APP_STORE_CONNECT_API_KEY"]))
+        end
+        
+        @api_key = app_store_connect_api_key(
+          key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
+          issuer_id: ENV["APP_STORE_CONNECT_ISSUER_ID"],
+          key_filepath: File.expand_path(api_key_file),
+          duration: 1200,
+          in_house: false
+        )
+      rescue => error
+        UI.error("Failed to configure API key: #{error.message}")
         raise "API configuration failed"
       end
     end
@@ -401,12 +429,24 @@ platform :ios do
 
   desc "Upload to App Store"
   lane :appstore_upload do |options|
-    # Use the API key configured in the calling lane
+    # Configure API key if not already configured
     if @api_key == nil
-      # Configure API key if not already configured
-      @api_key = configure_api_key
-      if @api_key == nil
-        UI.error("Failed to configure API key")
+      begin
+        api_key_file = "AuthKey_#{ENV['APP_STORE_CONNECT_API_KEY_ID']}.p8"
+        
+        unless File.exist?(api_key_file)
+          File.write(api_key_file, Base64.decode64(ENV["APP_STORE_CONNECT_API_KEY"]))
+        end
+        
+        @api_key = app_store_connect_api_key(
+          key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
+          issuer_id: ENV["APP_STORE_CONNECT_ISSUER_ID"],
+          key_filepath: File.expand_path(api_key_file),
+          duration: 1200,
+          in_house: false
+        )
+      rescue => error
+        UI.error("Failed to configure API key: #{error.message}")
         raise "API configuration failed"
       end
     end
@@ -438,9 +478,22 @@ platform :ios do
   lane :deploy_testflight do |options|
     begin
       # Configure API key
-      @api_key = configure_api_key
-      if @api_key == nil
-        UI.error("Failed to configure API key")
+      begin
+        api_key_file = "AuthKey_#{ENV['APP_STORE_CONNECT_API_KEY_ID']}.p8"
+        
+        unless File.exist?(api_key_file)
+          File.write(api_key_file, Base64.decode64(ENV["APP_STORE_CONNECT_API_KEY"]))
+        end
+        
+        @api_key = app_store_connect_api_key(
+          key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
+          issuer_id: ENV["APP_STORE_CONNECT_ISSUER_ID"],
+          key_filepath: File.expand_path(api_key_file),
+          duration: 1200,
+          in_house: false
+        )
+      rescue => error
+        UI.error("Failed to configure API key: #{error.message}")
         raise "API configuration failed"
       end
       
@@ -471,9 +524,22 @@ platform :ios do
   lane :deploy_appstore do |options|
     begin
       # Configure API key
-      @api_key = configure_api_key
-      if @api_key == nil
-        UI.error("Failed to configure API key")
+      begin
+        api_key_file = "AuthKey_#{ENV['APP_STORE_CONNECT_API_KEY_ID']}.p8"
+        
+        unless File.exist?(api_key_file)
+          File.write(api_key_file, Base64.decode64(ENV["APP_STORE_CONNECT_API_KEY"]))
+        end
+        
+        @api_key = app_store_connect_api_key(
+          key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
+          issuer_id: ENV["APP_STORE_CONNECT_ISSUER_ID"],
+          key_filepath: File.expand_path(api_key_file),
+          duration: 1200,
+          in_house: false
+        )
+      rescue => error
+        UI.error("Failed to configure API key: #{error.message}")
         raise "API configuration failed"
       end
       
@@ -504,14 +570,32 @@ platform :ios do
 
   desc "Deploy to App Store (skip precheck entirely)"
   lane :deploy_appstore_no_precheck do |options|
-    # Use the API key configured in the calling lane
-    if @api_key == nil
-      # Configure API key if not already configured
-      @api_key = configure_api_key
-      if @api_key == nil
-        UI.error("Failed to configure API key")
-        raise "API configuration failed"
+    # Configure API key for this lane
+    begin
+      # Create API key file from base64 encoded content
+      api_key_file = "AuthKey_#{ENV['APP_STORE_CONNECT_API_KEY_ID']}.p8"
+      
+      # Check if file already exists (from GitHub Actions step)
+      unless File.exist?(api_key_file)
+        UI.message("Creating API key file: #{api_key_file}")
+        File.write(api_key_file, Base64.decode64(ENV["APP_STORE_CONNECT_API_KEY"]))
+      else
+        UI.message("Using existing API key file: #{api_key_file}")
       end
+      
+      # Configure the API key
+      @api_key = app_store_connect_api_key(
+        key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
+        issuer_id: ENV["APP_STORE_CONNECT_ISSUER_ID"],
+        key_filepath: File.expand_path(api_key_file),
+        duration: 1200, # 20 minutes
+        in_house: false
+      )
+      
+      UI.success("Successfully configured App Store Connect API key")
+    rescue => error
+      UI.error("Failed to configure API key: #{error.message}")
+      raise "API configuration failed"
     end
     
     # Build the app using API key authentication
@@ -558,9 +642,22 @@ platform :ios do
   lane :test_certificates do
     begin
       # Configure API key
-      @api_key = configure_api_key
-      if @api_key == nil
-        UI.error("Failed to configure API key")
+      begin
+        api_key_file = "AuthKey_#{ENV['APP_STORE_CONNECT_API_KEY_ID']}.p8"
+        
+        unless File.exist?(api_key_file)
+          File.write(api_key_file, Base64.decode64(ENV["APP_STORE_CONNECT_API_KEY"]))
+        end
+        
+        @api_key = app_store_connect_api_key(
+          key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
+          issuer_id: ENV["APP_STORE_CONNECT_ISSUER_ID"],
+          key_filepath: File.expand_path(api_key_file),
+          duration: 1200,
+          in_house: false
+        )
+      rescue => error
+        UI.error("Failed to configure API key: #{error.message}")
         raise "API configuration failed"
       end
       
