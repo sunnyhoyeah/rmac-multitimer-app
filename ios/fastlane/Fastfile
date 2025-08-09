@@ -380,7 +380,28 @@ platform :ios do
       
     rescue => error
       UI.error("❌ Failed to create certificates/profiles: #{error.message}")
-      raise "Certificate setup failed"
+      if error.message.include?("maximum number") || error.message.include?("already have a current")
+        UI.message("⚠️ Certificate limit reached or already exists - using existing certificate...")
+        # Continue anyway, as we have an existing certificate
+        # Try to get the provisioning profile anyway
+        begin
+          provisioning_profile = sigh(
+            api_key: api_key,
+            app_identifier: APP_IDENTIFIER,
+            team_id: "78MY3LW536",
+            adhoc: false,  # App Store distribution
+            development: false,  # App Store distribution
+            force: false  # Don't create if already exists
+          )
+          UI.success("✅ Provisioning profile ready")
+          UI.message("Profile UUID: #{provisioning_profile}")
+        rescue => profile_error
+          UI.error("Failed to get provisioning profile: #{profile_error.message}")
+          raise "Provisioning profile setup failed"
+        end
+      else
+        raise "Certificate setup failed"
+      end
     end
 
     # Build with manual signing using the created provisioning profile
