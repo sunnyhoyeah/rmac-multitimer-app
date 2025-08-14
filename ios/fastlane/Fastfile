@@ -295,12 +295,7 @@ platform :ios do
     # Install/update CocoaPods dependencies
     cocoapods(clean_install: false)
     
-    # Build Flutter app first to ensure latest version is used
-    Dir.chdir("..") do
-      sh("flutter", "build", "ios", "--release", "--no-codesign")
-    end
-    
-    # Increment build number
+    # Increment build number (before building)
     increment_build_number(
       xcodeproj: "Runner.xcodeproj"
     )
@@ -343,12 +338,7 @@ platform :ios do
     # Install/update CocoaPods dependencies
     cocoapods(clean_install: false)
     
-    # Build Flutter app first to ensure latest version is used
-    Dir.chdir("..") do
-      sh("flutter", "build", "ios", "--release", "--no-codesign")
-    end
-    
-    # Increment build number
+    # Increment build number (before building)
     increment_build_number(
       xcodeproj: "Runner.xcodeproj"
     )
