@@ -300,7 +300,9 @@ platform :ios do
       xcodeproj: "Runner.xcodeproj"
     )
     
-    # Build the app
+    # Build with automatic signing and provisioning updates
+    UI.message("🔨 Building for App Store distribution with automatic signing...")
+    
     build_ios_app(
       workspace: WORKSPACE,
       scheme: SCHEME,
@@ -343,33 +345,6 @@ platform :ios do
       xcodeproj: "Runner.xcodeproj"
     )
     
-    # Create distribution certificate and provisioning profile manually
-    UI.message("🔐 Managing certificates and profiles...")
-    begin
-      # Try to get or create distribution certificate
-      cert(
-        api_key: api_key,
-        username: nil,  # Use API key instead
-        development: false,
-        output_path: "/tmp"
-      )
-      
-      # Create/get provisioning profile for distribution
-      profile_result = sigh(
-        api_key: api_key,
-        app_identifier: APP_IDENTIFIER,
-        username: nil,  # Use API key instead
-        readonly: false,  # Allow creating new profiles
-        output_path: "/tmp"
-      )
-      
-      UI.message("� Created/found provisioning profile: #{profile_result}")
-      
-    rescue => error
-      UI.error("Certificate/profile management failed: #{error.message}")
-      UI.message("Continuing with automatic signing fallback...")
-    end
-    
     # Build with simplified parameters
     UI.message("🔨 Building for App Store distribution...")
     
@@ -381,6 +356,7 @@ platform :ios do
       export_method: "app-store",
       output_directory: "./build",
       output_name: "Runner.ipa",
+      xcargs: "-allowProvisioningUpdates -authenticationKeyPath #{File.expand_path(api_key_file)} -authenticationKeyID #{ENV['APP_STORE_CONNECT_API_KEY_ID']} -authenticationKeyIssuerID #{ENV['APP_STORE_CONNECT_ISSUER_ID']}",
       export_options: {
         method: "app-store",
         teamID: "78MY3LW536",
