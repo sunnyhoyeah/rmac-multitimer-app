@@ -352,6 +352,8 @@ platform :ios do
       configuration: "Release",
       clean: true,
       export_method: "app-store",
+      destination: "generic/platform=iOS",
+      sdk: "iphoneos",
       output_directory: "./build",
       output_name: "Runner.ipa",
       xcargs: "-allowProvisioningUpdates -authenticationKeyPath #{File.expand_path(api_key_file)} -authenticationKeyID #{ENV['APP_STORE_CONNECT_API_KEY_ID']} -authenticationKeyIssuerID #{ENV['APP_STORE_CONNECT_ISSUER_ID']}",
