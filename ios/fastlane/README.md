@@ -77,7 +77,7 @@ Build the app for release
 [bundle exec] fastlane ios build_release_api_auth
 ```
 
-Build the app for release with API key authentication
+Build with Flutter then sign with Fastlane (BREAKTHROUGH SOLUTION)
 
 ### ios testflight_upload
 

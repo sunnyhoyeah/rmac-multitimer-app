@@ -315,9 +315,9 @@ platform :ios do
     )
   end
 
-  desc "Build the app for release with simplified signing"
+  desc "Build with Flutter then sign with Fastlane (BREAKTHROUGH SOLUTION)"
   lane :build_release_api_auth do |options|
-    # Configure API key first
+    # Configure API key
     begin
       api_key_file = "AuthKey_#{ENV['APP_STORE_CONNECT_API_KEY_ID']}.p8"
       
@@ -345,31 +345,39 @@ platform :ios do
     # Install/update CocoaPods dependencies
     cocoapods(clean_install: false)
     
-    # Increment build number (before building)
-    increment_build_number(
-      xcodeproj: "Runner.xcodeproj"
-    )
+    # Increment build number
+    increment_build_number(xcodeproj: "Runner.xcodeproj")
     
-    # Build with simple configuration - let Fastlane handle the signing
-    UI.message("🔨 Building for App Store distribution...")
+    # Build with Flutter (no codesigning)
+    UI.message("� Building unsigned app with Flutter...")
+    sh("cd .. && flutter build ios --release --no-codesign")
     
+    # Create archive using the built app
+    UI.message("📦 Creating signed archive and IPA...")
+    
+    # Use xcodebuild to create a proper archive from the built app
+    archive_path = File.expand_path("./build/Runner.xcarchive")
+    
+    sh("xcodebuild -workspace #{WORKSPACE} -scheme #{SCHEME} -configuration Release -archivePath '#{archive_path}' archive -allowProvisioningUpdates")
+    
+    # Export the archive as IPA
     build_ios_app(
-      workspace: WORKSPACE,
-      scheme: SCHEME,
-      configuration: "Release",
-      clean: true,
+      skip_build_archive: true,
+      archive_path: archive_path,
       export_method: "app-store",
       output_directory: "./build",
       output_name: "Runner.ipa",
-      skip_profile_detection: true,
       export_options: {
         method: "app-store",
         teamID: "78MY3LW536",
         uploadBitcode: false,
         uploadSymbols: true,
-        manageAppVersionAndBuildNumber: false
+        manageAppVersionAndBuildNumber: false,
+        signingStyle: "automatic"
       }
     )
+    
+    UI.success("✅ Build completed successfully!")
   end
 
   desc "Upload to TestFlight"
