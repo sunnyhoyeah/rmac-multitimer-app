@@ -33,8 +33,8 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen> {
   static const List<String> quotes = [
-    "改變",
-    //"靜待這一秒世界改善，抑或把握這一秒跑遍世界。",
+    //"改變",
+    "靜待這一秒世界改變，抑或把握這一秒走遍世界",
   ];
 
   late String randomQuote;
@@ -68,7 +68,7 @@ class _SplashScreenState extends State<SplashScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 32.0),
               child: Text(
-                '"$randomQuote"',
+                randomQuote,
                 style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic),
                 textAlign: TextAlign.center,
               ),
@@ -160,64 +160,128 @@ class _TimerListState extends State<TimerList> {
   Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
     final double screenHeight = mediaQuery.size.height;
-    final double appBarHeight = kToolbarHeight + mediaQuery.padding.top;
-    final double bottomBarHeight = 34;
-    final double availableHeight = screenHeight - appBarHeight - bottomBarHeight;
-    final double rowHeight = (availableHeight / 8).clamp(30.0, 200.0);
+    final double screenWidth = mediaQuery.size.width;
+    
+    // Responsive app bar height based on screen size - slightly increased for better text fit
+    final double appBarHeight = screenWidth < 375 ? 56 : 60; // Slightly increased for iPhone 13 mini
+    final double totalAppBarHeight = appBarHeight + mediaQuery.padding.top;
+    final double availableHeight = screenHeight - totalAppBarHeight - mediaQuery.padding.bottom;
+    
+    // Improved row height calculation prioritizing 8 rows visibility while maintaining usability
+    final double minRowHeight = screenWidth < 375 ? 70.0 : 80.0; // Adjusted to fit 8 rows
+    final double maxRowHeight = screenWidth < 375 ? 110.0 : 130.0; // Reasonable maximum
+    final double idealRowsToShow = 8.0; // Always try to show 8 rows
+    final double calculatedRowHeight = availableHeight / idealRowsToShow; // Prioritize 8 rows
+    final double rowHeight = calculatedRowHeight.clamp(minRowHeight, maxRowHeight);
 
     return Scaffold(
       resizeToAvoidBottomInset: true,
-      bottomNavigationBar: Container(
-        height: 90,
-        color: Colors.white,
-        padding: EdgeInsets.symmetric(horizontal: 8),
-        child: Row(
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0),
-              child: Image.asset(
-                'assets/RMAC_Text.png',
-                height: 16,
+      appBar: PreferredSize(
+        preferredSize: Size.fromHeight(appBarHeight),
+        child: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 2,
+          automaticallyImplyLeading: false,
+          titleSpacing: 0,
+          toolbarHeight: appBarHeight,
+          flexibleSpace: SafeArea(
+            child: Container(
+              height: appBarHeight,
+              padding: EdgeInsets.symmetric(
+                horizontal: screenWidth < 375 ? 2 : 6, // Reduced padding for more text space
+                vertical: screenWidth < 375 ? 1 : 3
+              ),
+              child: Row(
+                children: [
+                  // Logo with minimal padding
+                  Padding(
+                    padding: EdgeInsets.only(left: screenWidth < 375 ? 2.0 : 4.0, right: screenWidth < 375 ? 4.0 : 6.0),
+                    child: Image.asset(
+                      'assets/RMAC_Text.png',
+                      height: screenWidth < 375 ? 12 : 16,
+                    ),
+                  ),
+                  // Text with calculated available space
+                  Expanded(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        // Use larger base font sizes for better visibility
+                        final double baseFontSize = screenWidth < 375 ? 16 : 20;
+                        
+                        return Container(
+                          width: constraints.maxWidth,
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'MULTI TIMER', // Removed leading space for better fit
+                              style: TextStyle(
+                                fontSize: baseFontSize, // Larger base font size
+                                fontWeight: FontWeight.bold
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.visible,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  // Buttons with minimal spacing
+                  IconButton(
+                    icon: Icon(Icons.stop, size: screenWidth < 375 ? 20 : 26),
+                    onPressed: stopAllTimers,
+                    padding: EdgeInsets.zero,
+                    constraints: BoxConstraints(
+                      minWidth: screenWidth < 375 ? 28 : 36,
+                      minHeight: screenWidth < 375 ? 28 : 36
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.play_arrow, size: screenWidth < 375 ? 20 : 26),
+                    onPressed: startAllTimers,
+                    padding: EdgeInsets.zero,
+                    constraints: BoxConstraints(
+                      minWidth: screenWidth < 375 ? 28 : 36,
+                      minHeight: screenWidth < 375 ? 28 : 36
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.refresh, size: screenWidth < 375 ? 22 : 26), // Slightly smaller for consistency
+                    onPressed: resetAllTimers,
+                    padding: EdgeInsets.zero,
+                    constraints: BoxConstraints(
+                      minWidth: screenWidth < 375 ? 30 : 36, // Reduced for more text space
+                      minHeight: screenWidth < 375 ? 30 : 36
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.add, size: screenWidth < 375 ? 22 : 26), // Slightly smaller for consistency
+                    onPressed: addTimerRow,
+                    padding: EdgeInsets.zero,
+                    constraints: BoxConstraints(
+                      minWidth: screenWidth < 375 ? 30 : 36, // Reduced for more text space
+                      minHeight: screenWidth < 375 ? 30 : 36
+                    ),
+                  ),
+                ],
               ),
             ),
-            Text(' MULTI TIMER', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            Spacer(),
-            IconButton(
-              icon: Icon(Icons.stop, size: 32),
-              onPressed: stopAllTimers,
-              padding: EdgeInsets.zero,
-            ),
-            IconButton(
-              icon: Icon(Icons.play_arrow, size: 32),
-              onPressed: startAllTimers,
-              padding: EdgeInsets.zero,
-            ),
-            IconButton(
-              icon: Icon(Icons.refresh, size: 32),
-              onPressed: resetAllTimers,
-              padding: EdgeInsets.zero,
-            ),
-            IconButton(
-              icon: Icon(Icons.add, size: 32),
-              onPressed: addTimerRow,
-              padding: EdgeInsets.zero,
-            ),
-          ],
+          ),
         ),
       ),
-      body: SafeArea(
-        child: ReorderableListView(
-          scrollController: _scrollController,
-          buildDefaultDragHandles: true,
-          padding: EdgeInsets.zero,
-          children: [
+      body: ReorderableListView(
+        scrollController: _scrollController,
+        buildDefaultDragHandles: true,
+        padding: EdgeInsets.zero,
+        children: [
             for (int index = 0; index < runnerNames.length; index++)
               Container(
                 key: ValueKey('${runnerNames[index]}-$index'),
                 height: rowHeight,
                 child: Builder(
                   builder: (context) {
-                    final Color rowColor = index.isEven
+                    final Color rowColor = index.isOdd
                         ? Colors.white
                         : Color.fromRGBO(254, 205, 146, 1);
                     if (pendingDeleteIndex == index) {
@@ -229,16 +293,17 @@ class _TimerListState extends State<TimerList> {
                               child: IconButton(
                                 icon: Icon(Icons.delete, color: Colors.red, size: 32),
                                 onPressed: () {
-                                  setState(() {
-                                    pendingDeleteIndex = null;
-                                  });
-                                  removeTimerRow(index);
+                                  if (mounted) {
+                                    setState(() {
+                                      pendingDeleteIndex = null;
+                                    });
+                                    removeTimerRow(index);
+                                  }
                                 },
                               ),
                             ),
                           ),
-                          AnimatedPositioned(
-                            duration: Duration(milliseconds: 200),
+                          Positioned(
                             left: -60,
                             right: 60,
                             top: 0,
@@ -246,9 +311,11 @@ class _TimerListState extends State<TimerList> {
                             child: GestureDetector(
                               onHorizontalDragEnd: (details) {
                                 if (details.primaryVelocity != null && details.primaryVelocity! > 0) {
-                                  setState(() {
-                                    pendingDeleteIndex = null;
-                                  });
+                                  if (mounted) {
+                                    setState(() {
+                                      pendingDeleteIndex = null;
+                                    });
+                                  }
                                 }
                               },
                               child: Container(
@@ -274,9 +341,11 @@ class _TimerListState extends State<TimerList> {
                     return GestureDetector(
                       onHorizontalDragEnd: (details) {
                         if (details.primaryVelocity != null && details.primaryVelocity! < 0) {
-                          setState(() {
-                            pendingDeleteIndex = index;
-                          });
+                          if (mounted) {
+                            setState(() {
+                              pendingDeleteIndex = index;
+                            });
+                          }
                         }
                       },
                       child: Container(
@@ -300,17 +369,18 @@ class _TimerListState extends State<TimerList> {
               ),
           ],
           onReorder: (oldIndex, newIndex) {
-            setState(() {
-              if (newIndex > oldIndex) newIndex -= 1;
-              final name = runnerNames.removeAt(oldIndex);
-              final key = rowKeys.removeAt(oldIndex);
-              runnerNames.insert(newIndex, name);
-              rowKeys.insert(newIndex, key);
-              saveRunnerNames();
-            });
+            if (mounted) {
+              setState(() {
+                if (newIndex > oldIndex) newIndex -= 1;
+                final name = runnerNames.removeAt(oldIndex);
+                final key = rowKeys.removeAt(oldIndex);
+                runnerNames.insert(newIndex, name);
+                rowKeys.insert(newIndex, key);
+                saveRunnerNames();
+              });
+            }
           },
         ),
-      ),
     );
   }
 }
@@ -371,8 +441,18 @@ class _TimerRowState extends State<TimerRow> {
 
   @override
   void dispose() {
+    // Cancel the periodic timer first to prevent memory leaks and setState calls after dispose
+    _periodicTimer?.cancel();
+    _periodicTimer = null;
+    
+    // Stop the stopwatches
+    stopwatch.stop();
+    lapStopwatch.stop();
+    
+    // Dispose controllers and focus nodes
     _nameController.dispose();
     _nameFocusNode.dispose();
+    
     super.dispose();
   }
 
@@ -386,11 +466,13 @@ class _TimerRowState extends State<TimerRow> {
       currentLapTimeValue = _formatTime(lapStopwatch.elapsedMilliseconds);
     });
     _periodicTimer?.cancel();
-    _periodicTimer = Timer.periodic(const Duration(milliseconds: 16), (timer) {
-      setState(() {
-        timerValue = _formatTime(stopwatch.elapsedMilliseconds);
-        currentLapTimeValue = _formatTime(lapStopwatch.elapsedMilliseconds);
-      });
+    _periodicTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
+      if (mounted) { // Check if widget is still mounted
+        setState(() {
+          timerValue = _formatTime(stopwatch.elapsedMilliseconds);
+          currentLapTimeValue = _formatTime(lapStopwatch.elapsedMilliseconds);
+        });
+      }
     });
   }
 
@@ -505,6 +587,8 @@ class _TimerRowState extends State<TimerRow> {
 
   @override
   Widget build(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+    final double screenWidth = mediaQuery.size.width;
     final bool isOrangeRow = widget.rowColor == Color.fromRGBO(254, 205, 146, 1);
     final Color buttonColor = isOrangeRow
     ? Colors.white
@@ -512,6 +596,27 @@ class _TimerRowState extends State<TimerRow> {
      final Color buttonTextColor = isOrangeRow
     ? Colors.black
     : Colors.white;
+    
+    // Responsive flex ratios to give more space to name on small screens
+    final int nameFlex = screenWidth < 375 ? 2 : 1;  // More space for name on small screens
+    final int timerSectionFlex = screenWidth < 375 ? 3 : 2;  // Adjusted proportionally
+    
+    // Responsive font sizes based on screen width and row height - optimized for 8-row display
+    final double mainTimerFontSize = screenWidth < 375 
+        ? (widget.rowHeight * 0.32).clamp(22.0, 34.0)  // Slightly smaller ratio for compact rows
+        : screenWidth < 415  // iPhone 14 Pro Max is 430px, regular iPhone 14 is 390px
+            ? (widget.rowHeight * 0.36).clamp(28.0, 40.0) // Adjusted for 8-row visibility
+            : (widget.rowHeight * 0.38).clamp(32.0, 44.0); // Slightly larger for iPhone 14 Pro Max
+    
+    final double nameFontSize = screenWidth < 375 ? 15.0 : 17.0; // Slightly smaller for compact display
+    final double lapNumberFontSize = screenWidth < 375 ? 9.0 : 
+                                   screenWidth < 415 ? 10.0 : 11.0; // Progressive sizing
+    final double lapTimeFontSize = screenWidth < 375 ? 13.0 : 
+                                 screenWidth < 415 ? 14.0 : 15.0; // Progressive sizing
+    
+    // Responsive flex ratios to reduce spacing on larger screens
+    final int timerFlex = screenWidth < 375 ? 1 : 2;
+    final int lapFlex = screenWidth < 375 ? 1 : 1;
     //final Color buttonColor = isRunning ? Colors.deepOrange[300]! : Colors.orange[200]!;
     
     // Portrait layout only (landscape mode disabled)
@@ -585,11 +690,11 @@ class _TimerRowState extends State<TimerRow> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Top row: Runner name
+                  // Top row: Runner name with responsive sizing and proper vertical space
                   Expanded(
-                    flex: 1,
+                    flex: nameFlex, // More space on small screens
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 6.0),
+                      padding: EdgeInsets.symmetric(vertical: screenWidth < 375 ? 1.0 : 4.0), // Minimal padding to maximize text space
                       child: GestureDetector(
                         onTap: () async {
                           setState(() {
@@ -605,6 +710,7 @@ class _TimerRowState extends State<TimerRow> {
                         },
                         child: Container(
                           width: double.infinity,
+                          height: double.infinity, // Use full available height
                           alignment: Alignment.centerLeft,
                           color: Colors.transparent,
                           child: isEditingName
@@ -619,25 +725,33 @@ class _TimerRowState extends State<TimerRow> {
                                   decoration: InputDecoration(
                                     border: InputBorder.none,
                                     isDense: true,
-                                    contentPadding: EdgeInsets.only(left: 0),
+                                    contentPadding: EdgeInsets.zero, // Remove all padding for more space
                                   ),
                                   style: TextStyle(
-                                    fontSize: 18.0,
+                                    fontSize: nameFontSize, // Responsive font size
                                     fontWeight: FontWeight.normal,
                                     color: Colors.black,
                                     fontFamily: 'Courier',
+                                    height: 1.2, // Proper line height to prevent clipping
                                   ),
                                 )
-                              : Text(
-                                  _nameController.text.isEmpty ? ' ' : _nameController.text,
-                                  style: TextStyle(
-                                    fontSize: 18.0,
-                                    fontWeight: FontWeight.normal,
-                                    color: Colors.black,
-                                    fontFamily: 'Courier',
+                              : Container(
+                                  width: double.infinity,
+                                  height: double.infinity,
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    _nameController.text.isEmpty ? ' ' : _nameController.text,
+                                    style: TextStyle(
+                                      fontSize: nameFontSize, // Same font size as TextField
+                                      fontWeight: FontWeight.normal,
+                                      color: Colors.black,
+                                      fontFamily: 'Courier',
+                                      height: 1.2, // Proper line height to prevent vertical clipping
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis, // Use ellipsis instead of scaling
+                                    textAlign: TextAlign.left,
                                   ),
-                                  overflow: TextOverflow.ellipsis,
-                                  textAlign: TextAlign.left,
                                 ),
                         ),
                       ),
@@ -645,28 +759,30 @@ class _TimerRowState extends State<TimerRow> {
                   ),
                   // Bottom row: Timer value (large) and lap times (smaller)
                   Expanded(
-                    flex: 2,
+                    flex: timerSectionFlex, // Adjusted flex for better proportions
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         // Left column: Main timer value (larger font)
                         Expanded(
-                          flex: 1,
+                          flex: timerFlex, // More space for timer on larger screens
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 4.0),
+                            padding: EdgeInsets.symmetric(
+                              vertical: screenWidth < 375 ? 4.0 : 2.0, 
+                              horizontal: 2.0
+                            ),
                             child: FittedBox(
                               fit: BoxFit.scaleDown,
                               child: Text(
                                 timerValue,
                                 style: TextStyle(
-                                  fontSize: 44, // Reduced from 48 to prevent overflow
+                                  fontSize: mainTimerFontSize, // Responsive font size
                                   fontFamily: 'Courier',
                                   height: 1,
                                   fontWeight: FontWeight.bold,
                                   color: Colors.black,
                                 ),
                                 maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
                                 textAlign: TextAlign.center,
                               ),
                             ),
@@ -674,14 +790,17 @@ class _TimerRowState extends State<TimerRow> {
                         ),
                         // Right column: Current lap and last 2 lap times (smaller fonts)
                         Expanded(
-                          flex: 1,
+                          flex: lapFlex, // Responsive flex for lap times
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.end, // Align to right
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               // Current lap number and timer
                               Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 1.0, horizontal: 4.0),
+                                padding: EdgeInsets.symmetric(
+                                  vertical: screenWidth < 375 ? 1.0 : 0.5, 
+                                  horizontal: screenWidth < 375 ? 4.0 : 2.0
+                                ),
                                 child: Row(
                                   mainAxisAlignment: MainAxisAlignment.end, // Align row content to right
                                   mainAxisSize: MainAxisSize.min,
@@ -689,7 +808,7 @@ class _TimerRowState extends State<TimerRow> {
                                     Text(
                                       '$currentLapNumber',
                                       style: TextStyle(
-                                        fontSize: 14, // Reduced from 16 to prevent overflow
+                                        fontSize: lapNumberFontSize, // Responsive font size
                                         fontWeight: FontWeight.bold,
                                         color: Colors.red,
                                         fontFamily: 'Courier',
@@ -698,18 +817,21 @@ class _TimerRowState extends State<TimerRow> {
                                     ),
                                     SizedBox(width: 2),
                                     Flexible(
-                                      child: Text(
-                                        currentLapTimeValue,
-                                        style: TextStyle(
-                                          fontSize: 18, // Reduced from 20 to prevent overflow
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.red,
-                                          fontFamily: 'Courier',
-                                          height: 1,
+                                      child: FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        alignment: Alignment.centerRight,
+                                        child: Text(
+                                          currentLapTimeValue,
+                                          style: TextStyle(
+                                            fontSize: lapTimeFontSize, // Responsive font size
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.red,
+                                            fontFamily: 'Courier',
+                                            height: 1,
+                                          ),
+                                          maxLines: 1,
+                                          textAlign: TextAlign.right,
                                         ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        textAlign: TextAlign.right,
                                       ),
                                     ),
                                   ],
@@ -720,7 +842,10 @@ class _TimerRowState extends State<TimerRow> {
                                 ...[
                                   for (var i = 0; i < lapEntries.length && i < 2; i++)
                                     Padding(
-                                      padding: const EdgeInsets.symmetric(vertical: 1.0, horizontal: 4.0),
+                                      padding: EdgeInsets.symmetric(
+                                        vertical: screenWidth < 375 ? 1.0 : 0.5, 
+                                        horizontal: screenWidth < 375 ? 4.0 : 2.0
+                                      ),
                                       child: GestureDetector(
                                         onTap: _showLapTimesDialog,
                                         child: Row(
@@ -730,7 +855,7 @@ class _TimerRowState extends State<TimerRow> {
                                             Text(
                                               '${lapEntries.length - i}',
                                               style: TextStyle(
-                                                fontSize: 14, // Reduced from 16 to prevent overflow
+                                                fontSize: lapNumberFontSize, // Responsive font size
                                                 fontWeight: FontWeight.bold,
                                                 color: Colors.deepOrange[300], 
                                                 fontFamily: 'Courier',
@@ -739,18 +864,21 @@ class _TimerRowState extends State<TimerRow> {
                                             ),
                                             SizedBox(width: 2),
                                             Flexible(
-                                              child: Text(
-                                                lapEntries[i].lapTime,
-                                                style: TextStyle(
-                                                  fontSize: 18, // Reduced from 20 to prevent overflow
-                                                  fontWeight: FontWeight.bold,
-                                                  color: Colors.black,
-                                                  fontFamily: 'Courier',
-                                                  height: 1,
+                                              child: FittedBox(
+                                                fit: BoxFit.scaleDown,
+                                                alignment: Alignment.centerRight,
+                                                child: Text(
+                                                  lapEntries[i].lapTime,
+                                                  style: TextStyle(
+                                                    fontSize: lapTimeFontSize, // Responsive font size
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.black,
+                                                    fontFamily: 'Courier',
+                                                    height: 1,
+                                                  ),
+                                                  maxLines: 1,
+                                                  textAlign: TextAlign.right,
                                                 ),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                textAlign: TextAlign.right,
                                               ),
                                             ),
                                           ],
@@ -781,6 +909,13 @@ class LapTimesPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+    final double screenWidth = mediaQuery.size.width;
+    
+    // More aggressive font size reduction for iPhone 13 mini to ensure single-line fit
+    final double titleFontSize = screenWidth < 375 ? 16.0 : 18.0;
+    final double lapTextFontSize = screenWidth < 375 ? 10.0 : 14.0; // Reduced for small screens
+    
     List<int> lapMillis = lapEntries
         .map((e) => _parseDuration(e.lapTime).inMilliseconds)
         .toList();
@@ -788,7 +923,7 @@ class LapTimesPage extends StatelessWidget {
     int? minLap = lapMillis.isNotEmpty ? lapMillis.reduce((a, b) => a < b ? a : b) : null;
 
     return Padding(
-      padding: const EdgeInsets.all(16.0),
+      padding: EdgeInsets.all(screenWidth < 375 ? 12.0 : 16.0),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -797,12 +932,19 @@ class LapTimesPage extends StatelessWidget {
               Expanded(
                 child: Text(
                   '$runnerName Lap Times',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: TextStyle(fontSize: titleFontSize, fontWeight: FontWeight.bold),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
                 ),
               ),
               IconButton(
-                icon: Icon(Icons.close),
+                icon: Icon(Icons.close, size: screenWidth < 375 ? 20 : 24),
                 onPressed: () => Navigator.of(context).pop(),
+                padding: EdgeInsets.zero,
+                constraints: BoxConstraints(
+                  minWidth: screenWidth < 375 ? 32 : 40,
+                  minHeight: screenWidth < 375 ? 32 : 40,
+                ),
               ),
             ],
           ),
@@ -820,19 +962,68 @@ class LapTimesPage extends StatelessWidget {
                 if (lapMs == minLap) tileColor = Colors.green[100];
                 return ListTile(
                   tileColor: tileColor,
-                  dense: true,
+                  dense: true, // Always dense for consistent height
                   isThreeLine: false,
-                  title: Text(
-                    'Lap ${lapEntries.length - index}: ${entry.lapTime}   Split: ${entry.splitTime}',
-                    overflow: TextOverflow.ellipsis,
-                    softWrap: false,
-                    style: TextStyle(fontSize: 14),
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: screenWidth < 375 ? 6.0 : 16.0, // Reduced padding on small screens
+                    vertical: screenWidth < 375 ? 2.0 : 4.0,   // Minimal vertical padding
                   ),
-                  trailing: lapMs == maxLap
-                      ? Text('Min', style: TextStyle(color: Colors.red, fontSize: 14))
-                      : lapMs == minLap
-                          ? Text('Max', style: TextStyle(color: Colors.green, fontSize: 14))
-                          : null,
+                  title: LayoutBuilder(
+                    builder: (context, constraints) {
+                      // Calculate available width for text, reserving space for badge if needed
+                      double availableWidth = constraints.maxWidth;
+                      bool hasBadge = (lapMs == maxLap || lapMs == minLap);
+                      double badgeWidth = hasBadge ? (screenWidth < 375 ? 24 : 30) : 0;
+                      double spacing = hasBadge ? 4 : 0;
+                      double textWidth = availableWidth - badgeWidth - spacing;
+                      
+                      String displayText = 'Lap ${lapEntries.length - index}: ${entry.lapTime}   Split: ${entry.splitTime}';
+                      
+                      return Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          // Simple FittedBox solution for reliable single-line scaling
+                          SizedBox(
+                            width: textWidth,
+                            height: 20, // Fixed height for consistency
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                displayText,
+                                style: TextStyle(fontSize: lapTextFontSize, fontWeight: FontWeight.bold),
+                                maxLines: 1,
+                                overflow: TextOverflow.visible,
+                              ),
+                            ),
+                          ),
+                          // Compact badge
+                          if (hasBadge) ...[
+                            SizedBox(width: 4),
+                            Container(
+                              width: screenWidth < 375 ? 20 : 26,
+                              height: screenWidth < 375 ? 14 : 16,
+                              decoration: BoxDecoration(
+                                color: lapMs == maxLap ? Colors.red : Colors.green,
+                                borderRadius: BorderRadius.circular(screenWidth < 375 ? 2 : 3),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  lapMs == maxLap ? 'Min' : 'Max',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: screenWidth < 375 ? 6 : 7,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      );
+                    },
+                  ),
+                  trailing: null, // No trailing needed since badge is integrated
                 );
               },
             ),

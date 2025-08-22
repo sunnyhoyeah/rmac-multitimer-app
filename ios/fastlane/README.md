@@ -143,6 +143,14 @@ Refresh certificates and provisioning profiles
 
 Test certificate creation with API key
 
+### ios diagnose_certificates
+
+```sh
+[bundle exec] fastlane ios diagnose_certificates
+```
+
+Diagnose certificates and provisioning profiles
+
 ----
 
 This README.md is auto-generated and will be re-generated every time [_fastlane_](https://fastlane.tools) is run.

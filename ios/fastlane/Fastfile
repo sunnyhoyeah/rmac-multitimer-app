@@ -369,7 +369,7 @@ platform :ios do
       output_name: "Runner.ipa",
       export_options: {
         method: "app-store",
-        teamID: "78MY3LW536",
+        teamID: "VG8Q2JW587",
         uploadBitcode: false,
         uploadSymbols: true,
         manageAppVersionAndBuildNumber: false,
@@ -455,7 +455,10 @@ platform :ios do
       skip_metadata: false,
       skip_screenshots: true,
       precheck_include_in_app_purchases: false, # Skip in-app purchase check for API key
-      submission_information: options[:submission_information] || {},
+      submission_information: {
+        export_compliance_uses_encryption: false,
+        add_id_info_uses_idfa: false
+      },
       release_notes: {
         "en-US" => options[:release_notes] || "Bug fixes and performance improvements"
       }
@@ -676,6 +679,66 @@ platform :ios do
       UI.error("❌ Certificate test failed: #{error.message}")
       UI.error("Error class: #{error.class}")
       UI.error("Full error: #{error.backtrace.first(5).join('\n')}")
+    ensure
+      cleanup_api_key
+    end
+  end
+
+  desc "Diagnose certificates and provisioning profiles"
+  lane :diagnose_certificates do
+    begin
+      # Configure API key
+      api_key_file = "AuthKey_#{ENV['APP_STORE_CONNECT_API_KEY_ID']}.p8"
+      
+      unless File.exist?(api_key_file)
+        File.write(api_key_file, Base64.decode64(ENV["APP_STORE_CONNECT_API_KEY"]))
+      end
+      
+      @api_key = app_store_connect_api_key(
+        key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
+        issuer_id: ENV["APP_STORE_CONNECT_ISSUER_ID"],
+        key_filepath: File.expand_path(api_key_file),
+        duration: 1200,
+        in_house: false
+      )
+      
+      UI.message("🔍 Checking available certificates and provisioning profiles...")
+      
+      # Get certificates
+      begin
+        certs = get_certificates(api_key: @api_key)
+        UI.message("📜 Available certificates:")
+        certs.each_with_index do |cert, index|
+          UI.message("  #{index + 1}. #{cert['name']} (#{cert['certificateType']}) - #{cert['id']}")
+        end
+      rescue => e
+        UI.error("Failed to get certificates: #{e.message}")
+      end
+      
+      # Get provisioning profiles
+      begin
+        profiles = get_provisioning_profile(
+          api_key: @api_key,
+          app_identifier: APP_IDENTIFIER
+        )
+        UI.message("📄 Available provisioning profiles for #{APP_IDENTIFIER}:")
+        profiles.each_with_index do |profile, index|
+          UI.message("  #{index + 1}. #{profile['name']} (#{profile['profileType']}) - #{profile['id']}")
+        end
+      rescue => e
+        UI.error("Failed to get provisioning profiles: #{e.message}")
+      end
+      
+      # Check local certificates in keychain
+      UI.message("🔑 Checking local keychain for certificates...")
+      begin
+        sh("security find-identity -v -p codesigning | grep 'VG8Q2JW587' || echo 'No certificates found for team VG8Q2JW587'")
+      rescue => e
+        UI.error("Failed to check keychain: #{e.message}")
+      end
+      
+    rescue => error
+      UI.error("Diagnosis failed: #{error.message}")
     ensure
       cleanup_api_key
     end
