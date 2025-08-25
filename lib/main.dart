@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:math';
+import 'dart:convert';
+import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter/services.dart'; 
+import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart'; 
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -138,22 +141,82 @@ class _TimerListState extends State<TimerList> {
 }
 
   Future<void> saveRunnerNames() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList('runnerNames', runnerNames);
+    try {
+      // Save to both SharedPreferences and Document Directory for maximum reliability
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('runnerNames', runnerNames);
+      
+      // Also save to document directory (survives app updates)
+      await _saveToDocumentDirectory();
+    } catch (e) {
+      print('Error saving runner names: $e');
+    }
   }
 
   Future<void> loadRunnerNames() async {
-    final prefs = await SharedPreferences.getInstance();
-    final savedNames = prefs.getStringList('runnerNames');
-    if (savedNames != null && savedNames.isNotEmpty) {
-      setState(() {
-        runnerNames = savedNames;
-        rowKeys = List.generate(
-          runnerNames.length,
-          (_) => GlobalKey<_TimerRowState>(),
-        );
-      });
+    try {
+      // First try to load from document directory (survives app updates)
+      List<String>? savedNames = await _loadFromDocumentDirectory();
+      
+      // If document directory doesn't have data, try SharedPreferences
+      if (savedNames == null || savedNames.isEmpty) {
+        final prefs = await SharedPreferences.getInstance();
+        savedNames = prefs.getStringList('runnerNames');
+        
+        // If we found data in SharedPreferences, migrate it to document directory
+        if (savedNames != null && savedNames.isNotEmpty) {
+          await _saveToDocumentDirectory();
+        }
+      }
+      
+      if (savedNames != null && savedNames.isNotEmpty) {
+        setState(() {
+          runnerNames = savedNames!;
+          rowKeys = List.generate(
+            runnerNames.length,
+            (_) => GlobalKey<_TimerRowState>(),
+          );
+        });
+      }
+    } catch (e) {
+      print('Error loading runner names: $e');
     }
+  }
+
+  Future<void> _saveToDocumentDirectory() async {
+    try {
+      final directory = await getApplicationDocumentsDirectory();
+      final file = File('${directory.path}/runner_data.json');
+      
+      final data = {
+        'runnerNames': runnerNames,
+        'version': '1.0',
+        'lastUpdated': DateTime.now().toIso8601String(),
+      };
+      
+      await file.writeAsString(json.encode(data));
+    } catch (e) {
+      print('Error saving to document directory: $e');
+    }
+  }
+
+  Future<List<String>?> _loadFromDocumentDirectory() async {
+    try {
+      final directory = await getApplicationDocumentsDirectory();
+      final file = File('${directory.path}/runner_data.json');
+      
+      if (await file.exists()) {
+        final contents = await file.readAsString();
+        final data = json.decode(contents) as Map<String, dynamic>;
+        
+        if (data['runnerNames'] != null) {
+          return List<String>.from(data['runnerNames']);
+        }
+      }
+    } catch (e) {
+      print('Error loading from document directory: $e');
+    }
+    return null;
   }
 
   @override

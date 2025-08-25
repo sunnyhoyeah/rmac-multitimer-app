@@ -1,0 +1,1 @@
+Professional multi-timer app designed for track and field events. Supports multiple simultaneous timers with lap timing and precise split recording.

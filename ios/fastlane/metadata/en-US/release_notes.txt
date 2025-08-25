@@ -1,0 +1,1 @@
+Responsive layout improvements - Fixed timer, lap, and UI overflow issues across all iPhone models. Optimized for better user experience.
