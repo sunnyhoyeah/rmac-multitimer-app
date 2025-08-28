@@ -1,1 +1,1 @@
-Responsive layout improvements - Fixed timer, lap, and UI overflow issues across all iPhone models. Optimized for better user experience.
+Enhanced data persistence - Your timer settings and runner names now survive app updates! Plus responsive layout improvements for all iPhone models.

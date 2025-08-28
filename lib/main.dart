@@ -256,12 +256,14 @@ class _TimerListState extends State<TimerList> {
               ),
               child: Row(
                 children: [
-                  // Logo with minimal padding
+                  // Logo with minimal padding and perfect background color matching
                   Padding(
                     padding: EdgeInsets.only(left: screenWidth < 375 ? 2.0 : 4.0, right: screenWidth < 375 ? 4.0 : 6.0),
                     child: Image.asset(
-                      'assets/RMAC_Text.png',
+                      'assets/RMAC_Text_.png',
                       height: screenWidth < 375 ? 12 : 16,
+                      color: Colors.white, // Set the background color to match app bar exactly
+                      colorBlendMode: BlendMode.dstOver, // Blend background only, keep text as is
                     ),
                   ),
                   // Text with calculated available space
@@ -524,17 +526,16 @@ class _TimerRowState extends State<TimerRow> {
     lapStopwatch.start();
     setState(() {
       isRunning = true;
-      // Immediately update timer value for UI
-      timerValue = _formatTime(stopwatch.elapsedMilliseconds);
-      currentLapTimeValue = _formatTime(lapStopwatch.elapsedMilliseconds);
     });
     _periodicTimer?.cancel();
-    _periodicTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
+    _periodicTimer = Timer.periodic(const Duration(milliseconds: 10), (timer) {
       if (mounted) { // Check if widget is still mounted
         setState(() {
           timerValue = _formatTime(stopwatch.elapsedMilliseconds);
           currentLapTimeValue = _formatTime(lapStopwatch.elapsedMilliseconds);
         });
+      } else {
+        timer.cancel();
       }
     });
   }
@@ -548,7 +549,7 @@ class _TimerRowState extends State<TimerRow> {
       lapStopwatch.stop();
       _periodicTimer?.cancel();
       setState(() {
-        // Immediately update timer value for UI
+        // Final update of timer values to ensure accuracy
         timerValue = _formatTime(stopwatch.elapsedMilliseconds);
         currentLapTimeValue = _formatTime(lapStopwatch.elapsedMilliseconds);
         isRunning = false;
@@ -556,15 +557,15 @@ class _TimerRowState extends State<TimerRow> {
     }
   }
 
-  // Helper function for formatting time
+  // Helper function for formatting time with correct centiseconds
   String _formatTime(int ms) {
-    final int hundreds = (ms / 10).truncate();
-    final int seconds = (hundreds / 100).truncate();
+    final int centiseconds = (ms / 10).truncate();
+    final int seconds = (centiseconds / 100).truncate();
     final int minutes = (seconds / 60).truncate();
-    final String hundredsStr = (hundreds % 100).toString().padLeft(2, '0');
+    final String centisecondsStr = (centiseconds % 100).toString().padLeft(2, '0');
     final String secondsStr = (seconds % 60).toString().padLeft(2, '0');
     final String minutesStr = (minutes % 60).toString().padLeft(2, '0');
-    return '$minutesStr:$secondsStr:$hundredsStr';
+    return '$minutesStr:$secondsStr:$centisecondsStr';
   }
 
   void resetTimer() {
@@ -627,8 +628,8 @@ class _TimerRowState extends State<TimerRow> {
     final List<String> timeComponents = timeString.split(':');
     final int minutes = int.parse(timeComponents[0]);
     final int seconds = int.parse(timeComponents[1]);
-    final int hundredths = int.parse(timeComponents[2]);
-    return Duration(minutes: minutes, seconds: seconds, milliseconds: hundredths * 10);
+    final int centiseconds = int.parse(timeComponents[2]);
+    return Duration(minutes: minutes, seconds: seconds, milliseconds: centiseconds * 10);
   }
 
   void _showLapTimesDialog() {
