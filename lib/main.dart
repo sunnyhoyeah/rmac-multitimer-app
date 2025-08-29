@@ -57,28 +57,40 @@ class _SplashScreenState extends State<SplashScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white, 
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Image.asset('assets/rmac_timer.jpeg'),
-            SizedBox(height: 24),
-            Text(
-              'RMAC - MULTI TIMER',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 24),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32.0),
-              child: Text(
-                randomQuote,
-                style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic),
-                textAlign: TextAlign.center,
+      body: SafeArea(
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Image.asset('assets/rmac_timer.jpeg'),
+                    SizedBox(height: 24),
+                    Text(
+                      'RMAC - MULTI TIMER',
+                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                      textAlign: TextAlign.center,
+                    ),
+                    SizedBox(height: 24),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 32.0),
+                      child: Text(
+                        randomQuote,
+                        style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    SizedBox(height: 32),
+                    CircularProgressIndicator(),
+                  ],
+                ),
               ),
-            ),
-            SizedBox(height: 32),
-            CircularProgressIndicator(),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -256,14 +268,13 @@ class _TimerListState extends State<TimerList> {
               ),
               child: Row(
                 children: [
-                  // Logo with minimal padding and perfect background color matching
+                  // Logo with transparent background - no color issues!
                   Padding(
                     padding: EdgeInsets.only(left: screenWidth < 375 ? 2.0 : 4.0, right: screenWidth < 375 ? 4.0 : 6.0),
                     child: Image.asset(
-                      'assets/RMAC_Text_.png',
+                      'assets/RMAC_Text_transparent.png',
                       height: screenWidth < 375 ? 12 : 16,
-                      color: Colors.white, // Set the background color to match app bar exactly
-                      colorBlendMode: BlendMode.dstOver, // Blend background only, keep text as is
+                      fit: BoxFit.contain,
                     ),
                   ),
                   // Text with calculated available space
@@ -661,26 +672,30 @@ class _TimerRowState extends State<TimerRow> {
     ? Colors.black
     : Colors.white;
     
+    // Current lap timer color: red on white rows, black on orange rows
+    final Color currentLapTimerColor = isOrangeRow ? Colors.black : Colors.red;
+    
     // Responsive flex ratios to give more space to name on small screens
     final int nameFlex = screenWidth < 375 ? 2 : 1;  // More space for name on small screens
     final int timerSectionFlex = screenWidth < 375 ? 3 : 2;  // Adjusted proportionally
     
     // Responsive font sizes based on screen width and row height - optimized for 8-row display
+    // Balanced sizing: main timer still largest, lap times significantly larger but proportional
     final double mainTimerFontSize = screenWidth < 375 
-        ? (widget.rowHeight * 0.32).clamp(22.0, 34.0)  // Slightly smaller ratio for compact rows
+        ? (widget.rowHeight * 0.30).clamp(22.0, 32.0)  // Slightly increased for better visibility
         : screenWidth < 415  // iPhone 14 Pro Max is 430px, regular iPhone 14 is 390px
-            ? (widget.rowHeight * 0.36).clamp(28.0, 40.0) // Adjusted for 8-row visibility
-            : (widget.rowHeight * 0.38).clamp(32.0, 44.0); // Slightly larger for iPhone 14 Pro Max
+            ? (widget.rowHeight * 0.34).clamp(26.0, 38.0) // Increased for better balance
+            : (widget.rowHeight * 0.36).clamp(30.0, 42.0); // Increased for larger screens
     
-    final double nameFontSize = screenWidth < 375 ? 15.0 : 17.0; // Slightly smaller for compact display
-    final double lapNumberFontSize = screenWidth < 375 ? 9.0 : 
-                                   screenWidth < 415 ? 10.0 : 11.0; // Progressive sizing
-    final double lapTimeFontSize = screenWidth < 375 ? 13.0 : 
-                                 screenWidth < 415 ? 14.0 : 15.0; // Progressive sizing
+    final double nameFontSize = screenWidth < 375 ? 15.0 : 17.0; // Keep name font size unchanged
+    final double lapNumberFontSize = screenWidth < 375 ? 11.0 : 
+                                   screenWidth < 415 ? 12.0 : 13.0; // Increased for better visibility
+    final double lapTimeFontSize = screenWidth < 375 ? 19.0 : 
+                                 screenWidth < 415 ? 22.0 : 24.0; // Significantly increased, closer to main timer
     
-    // Responsive flex ratios to reduce spacing on larger screens
-    final int timerFlex = screenWidth < 375 ? 1 : 2;
-    final int lapFlex = screenWidth < 375 ? 1 : 1;
+    // Optimize flex ratios to better utilize space
+    final int timerFlex = screenWidth < 375 ? 2 : 3;  // More space for main timer
+    final int lapFlex = screenWidth < 375 ? 2 : 2;    // More space for lap times
     //final Color buttonColor = isRunning ? Colors.deepOrange[300]! : Colors.orange[200]!;
     
     // Portrait layout only (landscape mode disabled)
@@ -795,7 +810,6 @@ class _TimerRowState extends State<TimerRow> {
                                     fontSize: nameFontSize, // Responsive font size
                                     fontWeight: FontWeight.normal,
                                     color: Colors.black,
-                                    fontFamily: 'Courier',
                                     height: 1.2, // Proper line height to prevent clipping
                                   ),
                                 )
@@ -809,7 +823,6 @@ class _TimerRowState extends State<TimerRow> {
                                       fontSize: nameFontSize, // Same font size as TextField
                                       fontWeight: FontWeight.normal,
                                       color: Colors.black,
-                                      fontFamily: 'Courier',
                                       height: 1.2, // Proper line height to prevent vertical clipping
                                     ),
                                     maxLines: 1,
@@ -832,8 +845,8 @@ class _TimerRowState extends State<TimerRow> {
                           flex: timerFlex, // More space for timer on larger screens
                           child: Padding(
                             padding: EdgeInsets.symmetric(
-                              vertical: screenWidth < 375 ? 4.0 : 2.0, 
-                              horizontal: 2.0
+                              vertical: screenWidth < 375 ? 2.0 : 1.0, // Reduced padding for more space
+                              horizontal: 1.0 // Reduced horizontal padding
                             ),
                             child: FittedBox(
                               fit: BoxFit.scaleDown,
@@ -862,24 +875,29 @@ class _TimerRowState extends State<TimerRow> {
                               // Current lap number and timer
                               Padding(
                                 padding: EdgeInsets.symmetric(
-                                  vertical: screenWidth < 375 ? 1.0 : 0.5, 
-                                  horizontal: screenWidth < 375 ? 4.0 : 2.0
+                                  vertical: screenWidth < 375 ? 0.5 : 0.5, // Reduced vertical padding
+                                  horizontal: screenWidth < 375 ? 2.0 : 1.0 // Reduced horizontal padding
                                 ),
                                 child: Row(
                                   mainAxisAlignment: MainAxisAlignment.end, // Align row content to right
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Text(
-                                      '$currentLapNumber',
-                                      style: TextStyle(
-                                        fontSize: lapNumberFontSize, // Responsive font size
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.red,
-                                        fontFamily: 'Courier',
-                                        height: 1,
+                                    // Fixed width for lap number to maintain alignment
+                                    SizedBox(
+                                      width: screenWidth < 375 ? 18 : 20, // Fixed width for consistent alignment
+                                      child: Text(
+                                        '$currentLapNumber',
+                                        style: TextStyle(
+                                          fontSize: lapNumberFontSize, // Responsive font size
+                                          fontWeight: FontWeight.bold,
+                                          color: currentLapTimerColor, // Use dynamic color based on row
+                                          fontFamily: 'Courier',
+                                          height: 1,
+                                        ),
+                                        textAlign: TextAlign.right, // Right align within fixed width
                                       ),
                                     ),
-                                    SizedBox(width: 2),
+                                    SizedBox(width: 1), // Reduced spacing
                                     Flexible(
                                       child: FittedBox(
                                         fit: BoxFit.scaleDown,
@@ -889,7 +907,7 @@ class _TimerRowState extends State<TimerRow> {
                                           style: TextStyle(
                                             fontSize: lapTimeFontSize, // Responsive font size
                                             fontWeight: FontWeight.bold,
-                                            color: Colors.red,
+                                            color: currentLapTimerColor, // Use dynamic color based on row
                                             fontFamily: 'Courier',
                                             height: 1,
                                           ),
@@ -907,8 +925,8 @@ class _TimerRowState extends State<TimerRow> {
                                   for (var i = 0; i < lapEntries.length && i < 2; i++)
                                     Padding(
                                       padding: EdgeInsets.symmetric(
-                                        vertical: screenWidth < 375 ? 1.0 : 0.5, 
-                                        horizontal: screenWidth < 375 ? 4.0 : 2.0
+                                        vertical: screenWidth < 375 ? 0.5 : 0.5, // Reduced vertical padding
+                                        horizontal: screenWidth < 375 ? 2.0 : 1.0 // Reduced horizontal padding
                                       ),
                                       child: GestureDetector(
                                         onTap: _showLapTimesDialog,
@@ -916,17 +934,22 @@ class _TimerRowState extends State<TimerRow> {
                                           mainAxisAlignment: MainAxisAlignment.end, // Align row content to right
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            Text(
-                                              '${lapEntries.length - i}',
-                                              style: TextStyle(
-                                                fontSize: lapNumberFontSize, // Responsive font size
-                                                fontWeight: FontWeight.bold,
-                                                color: Colors.deepOrange[300], 
-                                                fontFamily: 'Courier',
-                                                height: 1,
+                                            // Fixed width for lap number to maintain alignment
+                                            SizedBox(
+                                              width: screenWidth < 375 ? 18 : 20, // Fixed width for consistent alignment
+                                              child: Text(
+                                                '${lapEntries.length - i}',
+                                                style: TextStyle(
+                                                  fontSize: lapNumberFontSize, // Responsive font size
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.black, 
+                                                  fontFamily: 'Courier',
+                                                  height: 1,
+                                                ),
+                                                textAlign: TextAlign.right, // Right align within fixed width
                                               ),
                                             ),
-                                            SizedBox(width: 2),
+                                            SizedBox(width: 1), // Reduced spacing
                                             Flexible(
                                               child: FittedBox(
                                                 fit: BoxFit.scaleDown,
