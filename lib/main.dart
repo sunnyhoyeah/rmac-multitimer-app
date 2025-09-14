@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/foundation.dart';
 import 'package:vibration/vibration.dart';
+import 'app_update_manager.dart';
 
 /// Comprehensive haptic feedback function with multiple fallbacks for Android compatibility
 Future<void> performHapticFeedback() async {
@@ -244,7 +245,27 @@ class _SplashScreenState extends State<SplashScreen> {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => TimerList()),
       );
+      
+      // Check for app updates after navigating to main screen
+      _checkForUpdates();
     });
+  }
+  
+  void _checkForUpdates() async {
+    // Wait a bit for the main screen to load
+    await Future.delayed(Duration(seconds: 3));
+    
+    if (mounted) {
+      try {
+        // Check for updates silently (don't show "no update" dialog)
+        AppUpdateManager.checkForUpdates(context, showNoUpdateDialog: false);
+      } catch (e) {
+        if (kDebugMode) {
+          print('Update check failed: $e');
+        }
+        // Silently fail - don't interrupt user experience
+      }
+    }
   }
 
   @override
