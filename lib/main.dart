@@ -5,7 +5,201 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
-import 'package:path_provider/path_provider.dart'; 
+import 'package:path_provider/path_provider.dart';
+import 'package:flutter/foundation.dart';
+import 'package:vibration/vibration.dart';
+
+/// Comprehensive haptic feedback function with multiple fallbacks for Android compatibility
+Future<void> performHapticFeedback() async {
+  if (kDebugMode) {
+    print('🔔 Attempting haptic feedback on ${defaultTargetPlatform}');
+  }
+  
+  try {
+    // Method 1: For Android, use the vibration plugin first (most reliable)
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      bool? hasVibrator = await Vibration.hasVibrator();
+      if (kDebugMode) print('📱 Device has vibrator: $hasVibrator');
+      
+      if (hasVibrator == true) {
+        try {
+          // Check if amplitude control is supported
+          bool? hasAmplitudeControl = await Vibration.hasAmplitudeControl();
+          if (kDebugMode) print('🎛️ Amplitude control support: $hasAmplitudeControl');
+          
+          if (hasAmplitudeControl == true) {
+            // Use amplitude-controlled vibration
+            await Vibration.vibrate(duration: 100, amplitude: 128);
+            if (kDebugMode) print('✅ Amplitude vibration succeeded');
+            return;
+          } else {
+            // Fallback to simple vibration
+            await Vibration.vibrate(duration: 100);
+            if (kDebugMode) print('✅ Simple vibration succeeded');
+            return;
+          }
+        } catch (e) {
+          if (kDebugMode) print('❌ Vibration plugin failed: $e');
+          // Continue to next method
+        }
+      } else {
+        if (kDebugMode) print('❌ No vibrator available on device');
+      }
+    }
+    
+    // Method 2: Try Flutter's built-in haptic feedback (iOS and Android fallback)
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      await HapticFeedback.mediumImpact();
+      if (kDebugMode) print('✅ iOS haptic feedback succeeded');
+      return;
+    }
+    
+    // Method 3: For Android fallback, try Flutter's haptic feedback
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      try {
+        await HapticFeedback.mediumImpact();
+        if (kDebugMode) print('✅ Android Flutter mediumImpact succeeded');
+        return;
+      } catch (e1) {
+        if (kDebugMode) print('❌ mediumImpact failed: $e1');
+        try {
+          await HapticFeedback.lightImpact();
+          if (kDebugMode) print('✅ Android lightImpact succeeded');
+          return;
+        } catch (e2) {
+          if (kDebugMode) print('❌ lightImpact failed: $e2');
+          try {
+            await HapticFeedback.heavyImpact();
+            if (kDebugMode) print('✅ Android heavyImpact succeeded');
+            return;
+          } catch (e3) {
+            if (kDebugMode) print('❌ heavyImpact failed: $e3');
+            try {
+              await HapticFeedback.selectionClick();
+              if (kDebugMode) print('✅ Android selectionClick succeeded');
+              return;
+            } catch (e4) {
+              if (kDebugMode) print('❌ selectionClick failed: $e4');
+              // Method 4: Manual vibration using platform channel
+              await _manualVibration();
+            }
+          }
+        }
+      }
+    }
+  } catch (e) {
+    // If all methods fail, print debug info but don't crash
+    if (kDebugMode) {
+      print('❌ All haptic feedback methods failed: $e');
+    }
+  }
+}
+
+/// Manual vibration using platform channel as ultimate fallback
+Future<void> _manualVibration() async {
+  try {
+    if (kDebugMode) print('🔧 Attempting manual vibration via platform channel');
+    const platform = MethodChannel('flutter/haptic_feedback');
+    await platform.invokeMethod('vibrate', {'duration': 50});
+    if (kDebugMode) print('✅ Manual vibration succeeded');
+  } catch (e) {
+    if (kDebugMode) {
+      print('❌ Manual vibration failed: $e');
+    }
+  }
+}
+
+/// Test method to specifically debug haptic feedback issues
+Future<void> testAllHapticMethods() async {
+  if (kDebugMode) {
+    print('🧪 HAPTIC TEST: Starting comprehensive haptic feedback test');
+    print('📱 Platform: ${defaultTargetPlatform}');
+  }
+  
+  // Test 1: Vibration plugin - hasVibrator check
+  try {
+    bool? hasVibrator = await Vibration.hasVibrator();
+    if (kDebugMode) print('🧪 TEST 1 - hasVibrator(): $hasVibrator');
+  } catch (e) {
+    if (kDebugMode) print('🧪 TEST 1 - hasVibrator() ERROR: $e');
+  }
+  
+  // Test 2: Vibration plugin - amplitude control check
+  try {
+    bool? hasAmplitudeControl = await Vibration.hasAmplitudeControl();
+    if (kDebugMode) print('🧪 TEST 2 - hasAmplitudeControl(): $hasAmplitudeControl');
+  } catch (e) {
+    if (kDebugMode) print('🧪 TEST 2 - hasAmplitudeControl() ERROR: $e');
+  }
+  
+  // Test 3: Simple vibration
+  try {
+    await Vibration.vibrate(duration: 100);
+    if (kDebugMode) print('🧪 TEST 3 - Simple vibrate(100ms): SUCCESS');
+    await Future.delayed(Duration(milliseconds: 200));
+  } catch (e) {
+    if (kDebugMode) print('🧪 TEST 3 - Simple vibrate(100ms) ERROR: $e');
+  }
+  
+  // Test 4: Amplitude vibration (if supported)
+  try {
+    await Vibration.vibrate(duration: 100, amplitude: 128);
+    if (kDebugMode) print('🧪 TEST 4 - Amplitude vibrate(100ms, 128): SUCCESS');
+    await Future.delayed(Duration(milliseconds: 200));
+  } catch (e) {
+    if (kDebugMode) print('🧪 TEST 4 - Amplitude vibrate(100ms, 128) ERROR: $e');
+  }
+  
+  // Test 5: Flutter's HapticFeedback.mediumImpact
+  try {
+    await HapticFeedback.mediumImpact();
+    if (kDebugMode) print('🧪 TEST 5 - HapticFeedback.mediumImpact(): SUCCESS');
+    await Future.delayed(Duration(milliseconds: 200));
+  } catch (e) {
+    if (kDebugMode) print('🧪 TEST 5 - HapticFeedback.mediumImpact() ERROR: $e');
+  }
+  
+  // Test 6: Flutter's HapticFeedback.lightImpact
+  try {
+    await HapticFeedback.lightImpact();
+    if (kDebugMode) print('🧪 TEST 6 - HapticFeedback.lightImpact(): SUCCESS');
+    await Future.delayed(Duration(milliseconds: 200));
+  } catch (e) {
+    if (kDebugMode) print('🧪 TEST 6 - HapticFeedback.lightImpact() ERROR: $e');
+  }
+  
+  // Test 7: Flutter's HapticFeedback.heavyImpact
+  try {
+    await HapticFeedback.heavyImpact();
+    if (kDebugMode) print('🧪 TEST 7 - HapticFeedback.heavyImpact(): SUCCESS');
+    await Future.delayed(Duration(milliseconds: 200));
+  } catch (e) {
+    if (kDebugMode) print('🧪 TEST 7 - HapticFeedback.heavyImpact() ERROR: $e');
+  }
+  
+  // Test 8: Flutter's HapticFeedback.selectionClick
+  try {
+    await HapticFeedback.selectionClick();
+    if (kDebugMode) print('🧪 TEST 8 - HapticFeedback.selectionClick(): SUCCESS');
+    await Future.delayed(Duration(milliseconds: 200));
+  } catch (e) {
+    if (kDebugMode) print('🧪 TEST 8 - HapticFeedback.selectionClick() ERROR: $e');
+  }
+  
+  // Test 9: Manual platform channel
+  try {
+    const platform = MethodChannel('flutter/haptic_feedback');
+    await platform.invokeMethod('vibrate', {'duration': 50});
+    if (kDebugMode) print('🧪 TEST 9 - Manual platform channel: SUCCESS');
+  } catch (e) {
+    if (kDebugMode) print('🧪 TEST 9 - Manual platform channel ERROR: $e');
+  }
+  
+  if (kDebugMode) {
+    print('🧪 HAPTIC TEST: Complete! Check above for working methods.');
+    print('💡 If no tests show SUCCESS, the device may not support vibration.');
+  }
+}
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -102,10 +296,38 @@ class TimerList extends StatefulWidget {
   _TimerListState createState() => _TimerListState();
 }
 
+// Timer state class to persist timer data across widget rebuilds
+class TimerState {
+  final String id;
+  Timer? periodicTimer;
+  bool isRunning = false;
+  Stopwatch lapStopwatch = Stopwatch();
+  String currentLapTimeValue = '00:00:00';
+  int currentLapNumber = 1;
+  Stopwatch stopwatch = Stopwatch();
+  String timerValue = '00:00:00';
+  String previousTime = '00:00:00';
+  List<LapEntry> lapEntries = [];
+  int lapNumber = 0;
+
+  TimerState(this.id);
+
+  void dispose() {
+    periodicTimer?.cancel();
+    periodicTimer = null;
+    stopwatch.stop();
+    lapStopwatch.stop();
+  }
+}
+
 class _TimerListState extends State<TimerList> {
   final ScrollController _scrollController = ScrollController();
   List<String> runnerNames = ['Runner 1', 'Runner 2', 'Runner 3'];
   late List<GlobalKey<_TimerRowState>> rowKeys;
+  
+  // NEW: Persistent timer states that survive scrolling
+  Map<String, TimerState> timerStates = {};
+  
   int? pendingDeleteIndex;
 
   @override
@@ -115,42 +337,204 @@ class _TimerListState extends State<TimerList> {
       runnerNames.length,
       (_) => GlobalKey<_TimerRowState>(),
     );
+    // Initialize timer states for each runner
+    _initializeTimerStates();
     loadRunnerNames();
+  }
+  
+  void _initializeTimerStates() {
+    for (int i = 0; i < runnerNames.length; i++) {
+      String uniqueId = 'timer_${i}_${runnerNames[i]}';
+      if (!timerStates.containsKey(uniqueId)) {
+        timerStates[uniqueId] = TimerState(uniqueId);
+      }
+    }
+  }
+  
+  String _getTimerStateId(int index) {
+    return 'timer_${index}_${runnerNames[index]}';
   }
 
   void startAllTimers() {
     for (int i = 0; i < runnerNames.length; i++) {
-      rowKeys[i].currentState?.startTimer();
+      String timerId = _getTimerStateId(i);
+      TimerState? timerState = timerStates[timerId];
+      if (timerState != null) {
+        _startTimer(timerState);
+      }
     }
   }
 
   void stopAllTimers() {
     for (int i = 0; i < runnerNames.length; i++) {
-      rowKeys[i].currentState?.stopTimer();
+      String timerId = _getTimerStateId(i);
+      TimerState? timerState = timerStates[timerId];
+      if (timerState != null) {
+        _stopTimer(timerState);
+      }
     }
   }
 
   void resetAllTimers() {
     for (int i = 0; i < runnerNames.length; i++) {
-      rowKeys[i].currentState?.resetTimer();
+      String timerId = _getTimerStateId(i);
+      TimerState? timerState = timerStates[timerId];
+      if (timerState != null) {
+        _resetTimer(timerState);
+      }
     }
+  }
+  
+  void _startTimer(TimerState timerState) {
+    timerState.stopwatch.start();
+    timerState.lapStopwatch.start();
+    timerState.isRunning = true;
+    timerState.periodicTimer?.cancel();
+    timerState.periodicTimer = Timer.periodic(const Duration(milliseconds: 10), (timer) {
+      if (mounted) {
+        timerState.timerValue = _formatTime(timerState.stopwatch.elapsedMilliseconds);
+        timerState.currentLapTimeValue = _formatTime(timerState.lapStopwatch.elapsedMilliseconds);
+        setState(() {}); // Trigger rebuild to update UI
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+  
+  void _takeLapTime(TimerState timerState) {
+    if (timerState.isRunning) {
+      final currentTimerValue = timerState.timerValue;
+      final lapTime = _calculateLapTime(currentTimerValue, timerState.previousTime);
+      final splitTime = currentTimerValue;
+      timerState.previousTime = currentTimerValue;
+      timerState.lapNumber++;
+      timerState.lapEntries.insert(0, LapEntry(lapTime: lapTime, splitTime: splitTime));
+      // Reset lap timer
+      timerState.lapStopwatch.reset();
+      timerState.lapStopwatch.start();
+      timerState.currentLapNumber = timerState.lapNumber + 1;
+      timerState.currentLapTimeValue = '00:00:00';
+      setState(() {}); // Trigger UI update
+    }
+  }
+  
+  String _calculateLapTime(String currentTimerValue, String previousTime) {
+    final currentDuration = _timeStringToDuration(currentTimerValue);
+    final previousDuration = _timeStringToDuration(previousTime);
+    final lapDuration = currentDuration - previousDuration;
+    final int ms = ((lapDuration.inMilliseconds % 1000) ~/ 10);
+    final String lapTime =
+        '${lapDuration.inMinutes.toString().padLeft(2, '0')}:'
+        '${(lapDuration.inSeconds % 60).toString().padLeft(2, '0')}:'
+        '${ms.toString().padLeft(2, '0')}';
+    return lapTime;
+  }
+
+  Duration _timeStringToDuration(String timeString) {
+    final List<String> timeComponents = timeString.split(':');
+    final int minutes = int.parse(timeComponents[0]);
+    final int seconds = int.parse(timeComponents[1]);
+    final int centiseconds = int.parse(timeComponents[2]);
+    return Duration(minutes: minutes, seconds: seconds, milliseconds: centiseconds * 10);
+  }
+  
+  void _stopTimer(TimerState timerState) {
+    if (timerState.isRunning) {
+      // Take a final lap time before stopping
+      _takeLapTime(timerState);
+    }
+    timerState.stopwatch.stop();
+    timerState.lapStopwatch.stop();
+    timerState.isRunning = false;
+    timerState.periodicTimer?.cancel();
+    setState(() {}); // Trigger UI update
+  }
+  
+  void _resetTimer(TimerState timerState) {
+    timerState.periodicTimer?.cancel();
+    timerState.stopwatch.reset();
+    timerState.lapStopwatch.reset();
+    timerState.isRunning = false;
+    timerState.timerValue = '00:00:00';
+    timerState.currentLapTimeValue = '00:00:00';
+    timerState.previousTime = '00:00:00';
+    timerState.lapEntries.clear();
+    timerState.currentLapNumber = 1;
+    timerState.lapNumber = 0;
+  }
+  
+  String _formatTime(int milliseconds) {
+    // Convert to centiseconds (1/100 second) format: MM:SS:CC
+    final int centiseconds = (milliseconds / 10).truncate();
+    final int seconds = (centiseconds / 100).truncate();
+    final int minutes = (seconds / 60).truncate();
+    final String centisecondsStr = (centiseconds % 100).toString().padLeft(2, '0');
+    final String secondsStr = (seconds % 60).toString().padLeft(2, '0');
+    final String minutesStr = (minutes % 60).toString().padLeft(2, '0');
+    return '$minutesStr:$secondsStr:$centisecondsStr';
   }
 
   void addTimerRow() {
     setState(() {
       runnerNames.add('Runner ${runnerNames.length + 1}');
       rowKeys.add(GlobalKey<_TimerRowState>());
+      
+      // Initialize timer state for new row
+      String newTimerId = _getTimerStateId(runnerNames.length - 1);
+      timerStates[newTimerId] = TimerState(newTimerId);
     });
     saveRunnerNames();
   }
 
   void removeTimerRow(int index) {
-  setState(() {
-    runnerNames.removeAt(index);
-    rowKeys.removeAt(index);
-  });
-  saveRunnerNames();
-}
+    // Clean up timer state before removing
+    String timerId = _getTimerStateId(index);
+    TimerState? timerState = timerStates[timerId];
+    if (timerState != null) {
+      timerState.dispose();
+      timerStates.remove(timerId);
+    }
+    
+    setState(() {
+      runnerNames.removeAt(index);
+      rowKeys.removeAt(index);
+    });
+    
+    // Reinitialize timer states for remaining rows to maintain correct indices
+    _reinitializeTimerStates();
+    saveRunnerNames();
+  }
+  
+  void _reinitializeTimerStates() {
+    Map<String, TimerState> newTimerStates = {};
+    for (int i = 0; i < runnerNames.length; i++) {
+      String newTimerId = _getTimerStateId(i);
+      
+      // Try to find existing timer state by runner name
+      TimerState? existingState;
+      for (var entry in timerStates.entries) {
+        if (entry.key.endsWith(runnerNames[i])) {
+          existingState = entry.value;
+          break;
+        }
+      }
+      
+      if (existingState != null) {
+        newTimerStates[newTimerId] = existingState;
+      } else {
+        newTimerStates[newTimerId] = TimerState(newTimerId);
+      }
+    }
+    
+    // Dispose old timer states that are no longer needed
+    for (var entry in timerStates.entries) {
+      if (!newTimerStates.containsValue(entry.value)) {
+        entry.value.dispose();
+      }
+    }
+    
+    timerStates = newTimerStates;
+  }
 
   Future<void> saveRunnerNames() async {
     try {
@@ -189,6 +573,8 @@ class _TimerListState extends State<TimerList> {
             (_) => GlobalKey<_TimerRowState>(),
           );
         });
+        // Reinitialize timer states after loading names
+        _initializeTimerStates();
       }
     } catch (e) {
       print('Error loading runner names: $e');
@@ -403,6 +789,7 @@ class _TimerListState extends State<TimerList> {
                                   scrollController: _scrollController,
                                   rowHeight: rowHeight,
                                   rowColor: rowColor,
+                                  timerState: timerStates[_getTimerStateId(index)]!,
                                   onNameChanged: (newName) {
                                     runnerNames[index] = newName;
                                     saveRunnerNames();
@@ -433,6 +820,7 @@ class _TimerListState extends State<TimerList> {
                           scrollController: _scrollController,
                           rowHeight: rowHeight,
                           rowColor: rowColor,
+                          timerState: timerStates[_getTimerStateId(index)]!,
                           onNameChanged: (newName) {
                             runnerNames[index] = newName;
                             saveRunnerNames();
@@ -473,6 +861,7 @@ class TimerRow extends StatefulWidget {
   final double rowHeight;
   final ValueChanged<String>? onNameChanged;
   final Color rowColor;
+  final TimerState timerState;
 
   TimerRow({
     Key? key,
@@ -481,6 +870,7 @@ class TimerRow extends StatefulWidget {
     required this.scrollController,
     required this.rowHeight,
     required this.rowColor, 
+    required this.timerState,
     this.onNameChanged, 
   }) : super(key: key);
 
@@ -489,19 +879,12 @@ class TimerRow extends StatefulWidget {
 }
 
 class _TimerRowState extends State<TimerRow> {
-  Timer? _periodicTimer;
   bool isEditingName = false;
-  bool isRunning = false;
-  Stopwatch lapStopwatch = Stopwatch();
-  String currentLapTimeValue = '00:00:00';
-  int currentLapNumber = 1;
-  Stopwatch stopwatch = Stopwatch();
-  String timerValue = '00:00:00';
-  String previousTime = '00:00:00';
-  List<LapEntry> lapEntries = [];
-  int lapNumber = 0;
   late TextEditingController _nameController;
   late FocusNode _nameFocusNode;
+
+  // Use the shared timer state instead of local state
+  TimerState get timerState => widget.timerState;
 
   @override
   void initState() {
@@ -517,130 +900,43 @@ class _TimerRowState extends State<TimerRow> {
 
   @override
   void dispose() {
-    // Cancel the periodic timer first to prevent memory leaks and setState calls after dispose
-    _periodicTimer?.cancel();
-    _periodicTimer = null;
-    
-    // Stop the stopwatches
-    stopwatch.stop();
-    lapStopwatch.stop();
-    
-    // Dispose controllers and focus nodes
+    // Only dispose UI-related resources, not the shared timer state
     _nameController.dispose();
     _nameFocusNode.dispose();
-    
     super.dispose();
   }
 
   void startTimer() {
-    stopwatch.start();
-    lapStopwatch.start();
-    setState(() {
-      isRunning = true;
-    });
-    _periodicTimer?.cancel();
-    _periodicTimer = Timer.periodic(const Duration(milliseconds: 10), (timer) {
-      if (mounted) { // Check if widget is still mounted
-        setState(() {
-          timerValue = _formatTime(stopwatch.elapsedMilliseconds);
-          currentLapTimeValue = _formatTime(lapStopwatch.elapsedMilliseconds);
-        });
-      } else {
-        timer.cancel();
-      }
-    });
+    // Delegate to parent's centralized timer management
+    final parentState = context.findAncestorStateOfType<_TimerListState>();
+    parentState?._startTimer(timerState);
   }
 
   void stopTimer() {
-    if (isRunning) {
-      // Take a final lap time before stopping
-      takeLapTime();
-      
-      stopwatch.stop();
-      lapStopwatch.stop();
-      _periodicTimer?.cancel();
-      setState(() {
-        // Final update of timer values to ensure accuracy
-        timerValue = _formatTime(stopwatch.elapsedMilliseconds);
-        currentLapTimeValue = _formatTime(lapStopwatch.elapsedMilliseconds);
-        isRunning = false;
-      });
-    }
-  }
-
-  // Helper function for formatting time with correct centiseconds
-  String _formatTime(int ms) {
-    final int centiseconds = (ms / 10).truncate();
-    final int seconds = (centiseconds / 100).truncate();
-    final int minutes = (seconds / 60).truncate();
-    final String centisecondsStr = (centiseconds % 100).toString().padLeft(2, '0');
-    final String secondsStr = (seconds % 60).toString().padLeft(2, '0');
-    final String minutesStr = (minutes % 60).toString().padLeft(2, '0');
-    return '$minutesStr:$secondsStr:$centisecondsStr';
+    // Delegate to parent's centralized timer management
+    final parentState = context.findAncestorStateOfType<_TimerListState>();
+    parentState?._stopTimer(timerState);
   }
 
   void resetTimer() {
-    stopwatch.stop();
-    stopwatch.reset();
-    lapStopwatch.stop();
-    lapStopwatch.reset();
-    _periodicTimer?.cancel(); // Cancel the periodic timer
-    setState(() {
-      isRunning = false;
-      timerValue = '00:00:00';
-      currentLapTimeValue = '00:00:00';
-      lapEntries.clear();
-      lapNumber = 0;
-      currentLapNumber = 1;
-      previousTime = '00:00:00'; 
-    });
+    // Delegate to parent's centralized timer management
+    final parentState = context.findAncestorStateOfType<_TimerListState>();
+    parentState?._resetTimer(timerState);
   }
 
   void takeLapTime() {
-    if (isRunning) {
-      final currentTimerValue = timerValue;
-      final lapTime = _calculateLapTime(currentTimerValue, previousTime);
-      final splitTime = currentTimerValue;
-      previousTime = currentTimerValue;
-      setState(() {
-        lapNumber++;
-        lapEntries.insert(0, LapEntry(lapTime: lapTime, splitTime: splitTime));
-        // Reset lap timer
-        lapStopwatch.reset();
-        lapStopwatch.start();
-        currentLapNumber = lapNumber + 1;
-        currentLapTimeValue = '00:00:00';
-      });
-    }
+    // Delegate to parent's centralized timer management
+    final parentState = context.findAncestorStateOfType<_TimerListState>();
+    parentState?._takeLapTime(timerState);
   }
 
   void _finishEditingName() {
-  setState(() {
-    isEditingName = false;
-  });
-  if (widget.onNameChanged != null) {
-    widget.onNameChanged!(_nameController.text);
-  }
-}
-
-  String _calculateLapTime(String currentTimerValue, String previousTime) {
-    final currentDuration = _timeStringToDuration(currentTimerValue);
-    final previousDuration = _timeStringToDuration(previousTime);
-    final lapDuration = currentDuration - previousDuration;
-    final int ms = ((lapDuration.inMilliseconds % 1000) ~/ 10);
-    final String lapTime =
-        '${lapDuration.inMinutes.toString().padLeft(2, '0')}:'
-        '${(lapDuration.inSeconds % 60).toString().padLeft(2, '0')}:'
-        '${ms.toString().padLeft(2, '0')}';
-    return lapTime;
-  }
-
-  Duration _timeStringToDuration(String timeString) {
-    final List<String> timeComponents = timeString.split(':');
-    final int minutes = int.parse(timeComponents[0]);
-    final int seconds = int.parse(timeComponents[1]);
-    final int centiseconds = int.parse(timeComponents[2]);
-    return Duration(minutes: minutes, seconds: seconds, milliseconds: centiseconds * 10);
+    setState(() {
+      isEditingName = false;
+    });
+    if (widget.onNameChanged != null) {
+      widget.onNameChanged!(_nameController.text);
+    }
   }
 
   void _showLapTimesDialog() {
@@ -652,7 +948,7 @@ class _TimerRowState extends State<TimerRow> {
         backgroundColor: Colors.white.withAlpha(238), 
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: LapTimesPage(
-          lapEntries: lapEntries,
+          lapEntries: timerState.lapEntries,
           runnerName: _nameController.text,
         ),
       ),
@@ -667,7 +963,7 @@ class _TimerRowState extends State<TimerRow> {
     final bool isOrangeRow = widget.rowColor == Color.fromRGBO(254, 205, 146, 1);
     final Color buttonColor = isOrangeRow
     ? Colors.white
-    : (isRunning ? Colors.deepOrange[300]! : const Color.fromRGBO(243, 134, 32, 1));
+    : (timerState.isRunning ? Colors.deepOrange[300]! : const Color.fromRGBO(243, 134, 32, 1));
      final Color buttonTextColor = isOrangeRow
     ? Colors.black
     : Colors.white;
@@ -719,12 +1015,13 @@ class _TimerRowState extends State<TimerRow> {
                     padding: EdgeInsets.zero,
                     backgroundColor: buttonColor, 
                   ),
-                  onPressed: () {
-                    HapticFeedback.mediumImpact();
-                    isRunning ? stopTimer() : startTimer();
+                  onPressed: () async {
+                    // Use comprehensive haptic feedback
+                    await performHapticFeedback();
+                    timerState.isRunning ? stopTimer() : startTimer();
                   },
                   child: Text(
-                    isRunning ? 'Stop' : 'Start',
+                    timerState.isRunning ? 'Stop' : 'Start',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -748,12 +1045,13 @@ class _TimerRowState extends State<TimerRow> {
                     padding: EdgeInsets.zero,
                     backgroundColor: buttonColor, 
                   ),
-                  onPressed: () {
-                    HapticFeedback.mediumImpact();
-                    isRunning ? takeLapTime() : resetTimer();
+                  onPressed: () async {
+                    // Use comprehensive haptic feedback
+                    await performHapticFeedback();
+                    timerState.isRunning ? takeLapTime() : resetTimer();
                   },
                   child: Text(
-                    isRunning ? 'Lap' : 'Reset',
+                    timerState.isRunning ? 'Lap' : 'Reset',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -851,7 +1149,7 @@ class _TimerRowState extends State<TimerRow> {
                             child: FittedBox(
                               fit: BoxFit.scaleDown,
                               child: Text(
-                                timerValue,
+                                timerState.timerValue,
                                 style: TextStyle(
                                   fontSize: mainTimerFontSize, // Responsive font size
                                   fontFamily: 'Courier',
@@ -886,7 +1184,7 @@ class _TimerRowState extends State<TimerRow> {
                                     SizedBox(
                                       width: screenWidth < 375 ? 18 : 20, // Fixed width for consistent alignment
                                       child: Text(
-                                        '$currentLapNumber',
+                                        '${timerState.currentLapNumber}',
                                         style: TextStyle(
                                           fontSize: lapNumberFontSize, // Responsive font size
                                           fontWeight: FontWeight.bold,
@@ -903,7 +1201,7 @@ class _TimerRowState extends State<TimerRow> {
                                         fit: BoxFit.scaleDown,
                                         alignment: Alignment.centerRight,
                                         child: Text(
-                                          currentLapTimeValue,
+                                          timerState.currentLapTimeValue,
                                           style: TextStyle(
                                             fontSize: lapTimeFontSize, // Responsive font size
                                             fontWeight: FontWeight.bold,
@@ -920,9 +1218,9 @@ class _TimerRowState extends State<TimerRow> {
                                 ),
                               ),
                               // Last two lap rows
-                              if (lapEntries.isNotEmpty)
+                              if (timerState.lapEntries.isNotEmpty)
                                 ...[
-                                  for (var i = 0; i < lapEntries.length && i < 2; i++)
+                                  for (var i = 0; i < timerState.lapEntries.length && i < 2; i++)
                                     Padding(
                                       padding: EdgeInsets.symmetric(
                                         vertical: screenWidth < 375 ? 0.5 : 0.5, // Reduced vertical padding
@@ -938,7 +1236,7 @@ class _TimerRowState extends State<TimerRow> {
                                             SizedBox(
                                               width: screenWidth < 375 ? 18 : 20, // Fixed width for consistent alignment
                                               child: Text(
-                                                '${lapEntries.length - i}',
+                                                '${timerState.lapEntries.length - i}',
                                                 style: TextStyle(
                                                   fontSize: lapNumberFontSize, // Responsive font size
                                                   fontWeight: FontWeight.bold,
@@ -955,7 +1253,7 @@ class _TimerRowState extends State<TimerRow> {
                                                 fit: BoxFit.scaleDown,
                                                 alignment: Alignment.centerRight,
                                                 child: Text(
-                                                  lapEntries[i].lapTime,
+                                                  timerState.lapEntries[i].lapTime,
                                                   style: TextStyle(
                                                     fontSize: lapTimeFontSize, // Responsive font size
                                                     fontWeight: FontWeight.bold,

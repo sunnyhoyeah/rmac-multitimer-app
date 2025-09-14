@@ -623,6 +623,29 @@ platform :ios do
     ) if ENV["SLACK_URL"]
   end
 
+  desc "Upload existing IPA to TestFlight"
+  lane :upload_existing_ipa do
+    # Configure API key
+    api_key = configure_app_store_connect_api_key
+    
+    unless api_key
+      UI.error("Failed to configure API key")
+      raise "API key configuration failed"
+    end
+    
+    # Upload to TestFlight
+    upload_to_testflight(
+      ipa: "./build/Runner.ipa",
+      api_key: api_key,
+      skip_waiting_for_build_processing: false,
+      changelog: "🎨 UI/UX Improvements:\n• Fixed logo color matching with AppBar\n• Improved timer and lap font sizing\n• Enhanced layout consistency across screen sizes\n• Optimized color scheme for better readability",
+      distribute_external: false,
+      notify_external_testers: false
+    )
+    
+    UI.success("✅ Upload to TestFlight completed!")
+  end
+
   desc "Setup certificates and provisioning profiles"
   lane :certificates do
     match(type: "development")

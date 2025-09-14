@@ -1,0 +1,18 @@
+RMAC - MULTI TIMER is a professional timing application designed specifically for track and field events. Developed by RMAC, this app provides accurate and reliable timing for athletes, coaches, and officials.
+
+Key Features:
+• Multiple Timer Support: Run multiple timers simultaneously for different events or athletes
+• Lap Time Tracking: Record and display lap times with precision timing
+• Portrait Orientation: Optimized interface for easy one-handed operation
+• Clean Interface: Simple, intuitive design focused on functionality
+• Reliable Performance: Built for consistent timing accuracy
+
+Perfect for:
+• Track and field coaches timing multiple athletes
+• Training sessions requiring precise lap times
+• Athletic events and competitions
+• Personal training and fitness tracking
+
+The app features a clean, professional interface with large, easy-to-read timers and controls. All timers can be started, stopped, and reset independently, making it ideal for managing multiple athletes or events simultaneously.
+
+Developed by RMAC with a focus on reliability and precision timing for athletic events.

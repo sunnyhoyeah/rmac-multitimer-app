@@ -45,3 +45,8 @@ app.*.map.json
 /android/app/release
 ios/build/
 ios/AuthKey_*.p8
+
+# Android signing keys (keep secure)
+android/key.properties
+android/app/upload-keystore.jks
+android/app/*.jks

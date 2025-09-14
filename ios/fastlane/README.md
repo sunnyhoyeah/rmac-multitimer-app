@@ -119,6 +119,14 @@ Deploy to App Store (build + upload + submit)
 
 Deploy to App Store (skip precheck entirely)
 
+### ios upload_existing_ipa
+
+```sh
+[bundle exec] fastlane ios upload_existing_ipa
+```
+
+Upload existing IPA to TestFlight
+
 ### ios certificates
 
 ```sh

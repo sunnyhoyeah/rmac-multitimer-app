@@ -1,35 +1,36 @@
 # RMAC MultiTimer
 
-A Flutter-based multi-timer application for track and field events. Built with automated CI/CDmake deploy-appstore-no-precheck # → App Store (skip precheck)
-```
+A Flutter-based multi-timer application for track and field events. Built with automated CI/CD and Google Play Store deployment.
 
-### What Happens During Git-Triggered Deployment
+## 🔧 Recent Updates
 
-1. ✅ **Version bumped** in `pubspec.yaml`
-2. ✅ **Git commit** created and tagged  
-3. ✅ **Pushed to GitHub** automatically
-4. ✅ **GitHub Actions** builds iOS app
-5. ✅ **Automated upload** to TestFlight/App Store Connect
-6. ✅ **GitHub Release** created with IPA file
-7. ✅ **Notifications sent** (if configured)
+### Timer Persistence Bug Fix (September 2025)
+**Issue**: When using 8+ timer rows, scrolling down and back up would cause timers in the first 4 rows to reset to 00:00:00 or freeze at the time they went off-screen.
 
-#### Deploy to TestFlight
-```bash
-# Local deployment
-make deploy-testflight
+**Secondary Issue**: After initial fix, timers ran too slowly (1/100 second became 1 second) due to incorrect time formatting.
 
-# Or via GitHub Actions
-gh workflow run ios-appstore-deployment.yml -f deployment_type=testflight
-```
+**Root Cause**: Dual timer management system where individual TimerRow widgets created their own periodic timers that got cancelled during ListView rebuilds while scrolling.
 
-#### Deploy to App Store
-```bash
-# Local deployment
-make deploy-appstore
+**Solution**: 
+- ✅ Centralized all timer logic in the parent `_TimerListState`
+- ✅ Eliminated dual timer systems - now uses only persistent `TimerState` objects
+- ✅ TimerRow widgets converted to pure UI components that delegate to parent
+- ✅ Timer states now persist correctly across scrolling and widget rebuilds
+- ✅ Fixed time format: MM:SS:CC (minutes:seconds:centiseconds) for proper 1/100 second precision
 
-# Or via GitHub Actions
-gh workflow run ios-appstore-deployment.yml -f deployment_type=appstore
-```ent.
+**Testing**: Verified with 16+ rows - all timers continue running correctly at proper speed during scrolling.
+
+### Android Haptic Feedback Fix (September 2025)
+**Issue**: Haptic feedback was working on iOS devices but not functioning on Android devices when tapping Start/Stop and Lap/Reset buttons.
+
+**Root Cause**: Missing `VIBRATE` permission in Android manifest and lack of error handling for haptic feedback failures.
+
+**Solution**: 
+- ✅ Added `<uses-permission android:name="android.permission.VIBRATE" />` to AndroidManifest.xml
+- ✅ Enhanced haptic feedback implementation with error handling and fallback mechanisms
+- ✅ Improved cross-platform compatibility for various Android device types
+
+**Testing**: Verified that haptic feedback now works consistently on both iOS and Android platforms.
 
 ## 🚀 Quick Start
 
