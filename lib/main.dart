@@ -376,6 +376,11 @@ class _TimerListState extends State<TimerList> {
     return 'timer_${index}_${runnerNames[index]}';
   }
 
+  TimerState _getTimerState(int index) {
+    String timerId = _getTimerStateId(index);
+    return timerStates[timerId] ?? TimerState(timerId);
+  }
+
   void startAllTimers() {
     for (int i = 0; i < runnerNames.length; i++) {
       String timerId = _getTimerStateId(i);
@@ -810,7 +815,7 @@ class _TimerListState extends State<TimerList> {
                                   scrollController: _scrollController,
                                   rowHeight: rowHeight,
                                   rowColor: rowColor,
-                                  timerState: timerStates[_getTimerStateId(index)]!,
+                                  timerState: _getTimerState(index),
                                   onNameChanged: (newName) {
                                     runnerNames[index] = newName;
                                     saveRunnerNames();
@@ -841,7 +846,7 @@ class _TimerListState extends State<TimerList> {
                           scrollController: _scrollController,
                           rowHeight: rowHeight,
                           rowColor: rowColor,
-                          timerState: timerStates[_getTimerStateId(index)]!,
+                          timerState: _getTimerState(index),
                           onNameChanged: (newName) {
                             runnerNames[index] = newName;
                             saveRunnerNames();
