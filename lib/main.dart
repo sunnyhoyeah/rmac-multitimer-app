@@ -381,6 +381,43 @@ class _TimerListState extends State<TimerList> {
     return timerStates[timerId] ?? TimerState(timerId);
   }
 
+  void _remapTimerStatesAfterReorder() {
+    // Create a new map with updated timer state IDs based on current order
+    Map<String, TimerState> newTimerStates = {};
+    
+    // For each runner in the current order, find their timer state by runner name
+    for (int i = 0; i < runnerNames.length; i++) {
+      String runnerName = runnerNames[i];
+      String newTimerId = _getTimerStateId(i);
+      
+      // Find existing timer state for this runner (search by runner name)
+      TimerState? existingState;
+      for (var entry in timerStates.entries) {
+        if (entry.key.endsWith('_$runnerName')) {
+          existingState = entry.value;
+          break;
+        }
+      }
+      
+      // If found, use existing state; otherwise create new one
+      if (existingState != null) {
+        newTimerStates[newTimerId] = existingState;
+      } else {
+        newTimerStates[newTimerId] = TimerState(newTimerId);
+      }
+    }
+    
+    // Dispose old timer states that are no longer used
+    for (var entry in timerStates.entries) {
+      if (!newTimerStates.containsValue(entry.value)) {
+        entry.value.dispose();
+      }
+    }
+    
+    // Replace the old timer states map
+    timerStates = newTimerStates;
+  }
+
   void startAllTimers() {
     for (int i = 0; i < runnerNames.length; i++) {
       String timerId = _getTimerStateId(i);
@@ -866,6 +903,10 @@ class _TimerListState extends State<TimerList> {
                 final key = rowKeys.removeAt(oldIndex);
                 runnerNames.insert(newIndex, name);
                 rowKeys.insert(newIndex, key);
+                
+                // CRITICAL FIX: Remap timer states after reordering
+                _remapTimerStatesAfterReorder();
+                
                 saveRunnerNames();
               });
             }
