@@ -341,7 +341,7 @@ class TimerState {
   }
 }
 
-class _TimerListState extends State<TimerList> {
+class _TimerListState extends State<TimerList> with TickerProviderStateMixin {
   final ScrollController _scrollController = ScrollController();
   List<String> runnerNames = ['Runner 1', 'Runner 2', 'Runner 3'];
   late List<GlobalKey<_TimerRowState>> rowKeys;
@@ -350,6 +350,23 @@ class _TimerListState extends State<TimerList> {
   Map<String, TimerState> timerStates = {};
   
   int? pendingDeleteIndex;
+  
+  // Sliding page functionality
+  late AnimationController _slideController;
+  late Animation<double> _slideAnimation;
+  bool _isSlidePageVisible = false;
+  
+  // Pace calculation variables
+  double _paceValue = 5.0; // Pace in minutes (e.g., 5.5 = 5:30)
+  bool _isEditingPace = false;
+  late TextEditingController _paceController;
+  late FocusNode _paceFocusNode;
+  
+  // Controllers and state for editable distance times
+  Map<String, TextEditingController> _distanceControllers = {};
+  String? _editingDistance;
+  DateTime? _lastDragTime;
+  DateTime? _lastHapticTime;
 
   @override
   void initState() {
@@ -361,6 +378,34 @@ class _TimerListState extends State<TimerList> {
     // Initialize timer states for each runner
     _initializeTimerStates();
     loadRunnerNames();
+    
+    // Initialize pace editing controllers
+    _paceController = TextEditingController(text: _formatPaceDisplay(_paceValue));
+    _paceFocusNode = FocusNode();
+    _paceFocusNode.addListener(() {
+      if (!_paceFocusNode.hasFocus && _isEditingPace) {
+        _finishEditingPace();
+      }
+    });
+    
+    // Initialize distance time controllers
+    final distances = ['400m', '550m', '800m', '1200m', '1400m', '1600m', '3km', '5km', '10km', 'Half', 'Full'];
+    for (String distance in distances) {
+      _distanceControllers[distance] = TextEditingController();
+    }
+    
+    // Initialize slide animation
+    _slideController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _slideAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _slideController,
+      curve: Curves.easeInOut,
+    ));
   }
   
   void _initializeTimerStates() {
@@ -374,6 +419,16 @@ class _TimerListState extends State<TimerList> {
   
   String _getTimerStateId(int index) {
     return 'timer_${index}_${runnerNames[index]}';
+  }
+
+  TimerState _getTimerState(int index) {
+    String timerId = _getTimerStateId(index);
+    TimerState? timerState = timerStates[timerId];
+    if (timerState == null) {
+      timerState = TimerState(timerId);
+      timerStates[timerId] = timerState;
+    }
+    return timerState;
   }
 
   void startAllTimers() {
@@ -753,122 +808,928 @@ class _TimerListState extends State<TimerList> {
           ),
         ),
       ),
-      body: ReorderableListView(
-        scrollController: _scrollController,
-        buildDefaultDragHandles: true,
-        padding: EdgeInsets.zero,
+      body: Stack(
         children: [
-            for (int index = 0; index < runnerNames.length; index++)
-              Container(
-                key: ValueKey('${runnerNames[index]}-$index'),
-                height: rowHeight,
-                child: Builder(
-                  builder: (context) {
-                    final Color rowColor = index.isOdd
-                        ? Colors.white
-                        : Color.fromRGBO(254, 205, 146, 1);
-                    if (pendingDeleteIndex == index) {
-                      return Stack(
-                        children: [
-                          Positioned.fill(
-                            child: Align(
-                              alignment: Alignment.centerRight,
-                              child: IconButton(
-                                icon: Icon(Icons.delete, color: Colors.red, size: 32),
-                                onPressed: () {
-                                  if (mounted) {
-                                    setState(() {
-                                      pendingDeleteIndex = null;
-                                    });
-                                    removeTimerRow(index);
-                                  }
-                                },
-                              ),
-                            ),
-                          ),
-                          Positioned(
-                            left: -60,
-                            right: 60,
-                            top: 0,
-                            bottom: 0,
-                            child: GestureDetector(
-                              onHorizontalDragEnd: (details) {
-                                if (details.primaryVelocity != null && details.primaryVelocity! > 0) {
-                                  if (mounted) {
-                                    setState(() {
-                                      pendingDeleteIndex = null;
-                                    });
-                                  }
-                                }
-                              },
-                              child: Container(
-                                color: rowColor,
-                                child: TimerRow(
-                                  key: rowKeys[index],
-                                  runnerName: runnerNames[index],
-                                  rowIndex: index,
-                                  scrollController: _scrollController,
-                                  rowHeight: rowHeight,
-                                  rowColor: rowColor,
-                                  timerState: timerStates[_getTimerStateId(index)]!,
-                                  onNameChanged: (newName) {
-                                    runnerNames[index] = newName;
-                                    saveRunnerNames();
+          // Main timer list content - no sliding, only buttons covered by drawer
+          ReorderableListView(
+            scrollController: _scrollController,
+            buildDefaultDragHandles: true,
+            padding: EdgeInsets.zero,
+            onReorder: (oldIndex, newIndex) {
+              if (mounted) {
+                setState(() {
+                  if (newIndex > oldIndex) newIndex -= 1;
+                  final name = runnerNames.removeAt(oldIndex);
+                  final key = rowKeys.removeAt(oldIndex);
+                  runnerNames.insert(newIndex, name);
+                  rowKeys.insert(newIndex, key);
+                  saveRunnerNames();
+                });
+              }
+            },
+            children: [
+              for (int index = 0; index < runnerNames.length; index++)
+                Container(
+                  key: ValueKey('${runnerNames[index]}-$index'),
+                  height: rowHeight,
+                  child: Builder(
+                    builder: (context) {
+                      final Color rowColor = index.isOdd
+                          ? Colors.white
+                          : Color.fromRGBO(254, 205, 146, 1);
+                      if (pendingDeleteIndex == index) {
+                        return Stack(
+                          children: [
+                            Positioned.fill(
+                              child: Align(
+                                alignment: Alignment.centerRight,
+                                child: IconButton(
+                                  icon: Icon(Icons.delete, color: Colors.red, size: 32),
+                                  onPressed: () {
+                                    if (mounted) {
+                                      setState(() {
+                                        pendingDeleteIndex = null;
+                                      });
+                                      removeTimerRow(index);
+                                    }
                                   },
                                 ),
                               ),
                             ),
-                          ),
-                        ],
-                      );
-                    }
-                    return GestureDetector(
-                      onHorizontalDragEnd: (details) {
-                        if (details.primaryVelocity != null && details.primaryVelocity! < 0) {
-                          if (mounted) {
-                            setState(() {
-                              pendingDeleteIndex = index;
-                            });
+                            Positioned(
+                              left: -60,
+                              right: 60,
+                              top: 0,
+                              bottom: 0,
+                              child: GestureDetector(
+                                onHorizontalDragEnd: (details) {
+                                  if (details.primaryVelocity != null && details.primaryVelocity! > 0) {
+                                    if (mounted) {
+                                      setState(() {
+                                        pendingDeleteIndex = null;
+                                      });
+                                    }
+                                  }
+                                },
+                                child: Container(
+                                  color: rowColor,
+                                  child: TimerRow(
+                                    key: rowKeys[index],
+                                    runnerName: runnerNames[index],
+                                    rowIndex: index,
+                                    scrollController: _scrollController,
+                                    rowHeight: rowHeight,
+                                    rowColor: rowColor,
+                                    timerState: _getTimerState(index),
+                                    onNameChanged: (newName) {
+                                      runnerNames[index] = newName;
+                                      saveRunnerNames();
+                                    },
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      }
+                      return GestureDetector(
+                        onHorizontalDragEnd: (details) {
+                          if (details.primaryVelocity != null && details.primaryVelocity! < -300) {
+                            if (mounted) {
+                              setState(() {
+                                pendingDeleteIndex = index;
+                              });
+                            }
                           }
-                        }
-                      },
-                      child: Container(
-                        color: rowColor,
-                        child: TimerRow(
-                          key: rowKeys[index],
-                          runnerName: runnerNames[index],
-                          rowIndex: index,
-                          scrollController: _scrollController,
-                          rowHeight: rowHeight,
-                          rowColor: rowColor,
-                          timerState: timerStates[_getTimerStateId(index)]!,
-                          onNameChanged: (newName) {
-                            runnerNames[index] = newName;
-                            saveRunnerNames();
-                          },
+                        },
+                        child: Container(
+                          color: rowColor,
+                          child: TimerRow(
+                            key: rowKeys[index],
+                            runnerName: runnerNames[index],
+                            rowIndex: index,
+                            scrollController: _scrollController,
+                            rowHeight: rowHeight,
+                            rowColor: rowColor,
+                            timerState: _getTimerState(index),
+                            onNameChanged: (newName) {
+                              runnerNames[index] = newName;
+                              saveRunnerNames();
+                            },
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+            ],
+          ),
+          // Slide-out panel - covers only the left button area (about 150px wide)
+          AnimatedBuilder(
+            animation: _slideAnimation,
+            builder: (context, child) {
+              // Panel width set to 155px as requested
+              final double panelWidth = 155;
+              final slideOffset = -panelWidth + (_slideAnimation.value * panelWidth);
+              return Transform.translate(
+                offset: Offset(slideOffset, 0),
+                child: Container(
+                  width: panelWidth,
+                  height: double.infinity,
+                  color: Colors.white,
+                  child: _buildSlidePanel(),
+                ),
+              );
+            },
+          ),
+          // PACE tab button - moves with drawer animation
+          AnimatedBuilder(
+            animation: _slideAnimation,
+            builder: (context, child) {
+              // Calculate tab position based on drawer state
+              final double panelWidth = 155; // Match panel width
+              final double tabLeftPosition = _slideAnimation.value * panelWidth;
+              
+              return Positioned(
+                bottom: 20,
+                left: tabLeftPosition,
+                child: GestureDetector(
+                  onTap: toggleSlidePanel,
+                  child: Container(
+                    width: 30, // Wider to accommodate rotated text properly
+                    height: 50, // Height that won't cover buttons
+                    decoration: BoxDecoration(
+                      color: Color.fromRGBO(243, 134, 32, 1),
+                      borderRadius: BorderRadius.only(
+                        topRight: Radius.circular(6),
+                        bottomRight: Radius.circular(6),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.3),
+                          blurRadius: 4,
+                          offset: Offset(2, 0),
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: Transform.rotate(
+                        angle: pi / 2, // Rotate 90 degrees clockwise
+                        child: Text(
+                          'PACE',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10, // Slightly larger font for better visibility
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5, // Better spacing for readability
+                          ),
+                          maxLines: 1, // Force single line
+                          overflow: TextOverflow.visible, // Don't clip the rotated text
                         ),
                       ),
-                    );
-                  },
+                    ),
+                  ),
                 ),
-              ),
-          ],
-          onReorder: (oldIndex, newIndex) {
-            if (mounted) {
-              setState(() {
-                if (newIndex > oldIndex) newIndex -= 1;
-                final name = runnerNames.removeAt(oldIndex);
-                final key = rowKeys.removeAt(oldIndex);
-                runnerNames.insert(newIndex, name);
-                rowKeys.insert(newIndex, key);
-                saveRunnerNames();
-              });
-            }
-          },
-        ),
+              );
+            },
+          ),
+        ],
+      ),
     );
   }
+
+  @override
+  void dispose() {
+    _slideController.dispose();
+    _paceController.dispose();
+    _paceFocusNode.dispose();
+    // Dispose distance controllers
+    for (var controller in _distanceControllers.values) {
+      controller.dispose();
+    }
+    // Dispose all timer states
+    for (var timerState in timerStates.values) {
+      timerState.dispose();
+    }
+    super.dispose();
+  }
+  
+  void toggleSlidePanel() {
+    setState(() {
+      _isSlidePageVisible = !_isSlidePageVisible;
+      if (_isSlidePageVisible) {
+        _slideController.forward();
+      } else {
+        _slideController.reverse();
+      }
+    });
+  }
+  
+  Widget _buildSlidePanel() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 8,
+            offset: Offset(2, 0),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Header - compact for narrow panel
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+            decoration: BoxDecoration(
+              color: Color.fromRGBO(243, 134, 32, 1),
+              borderRadius: BorderRadius.only(
+                bottomLeft: Radius.circular(8),
+                bottomRight: Radius.circular(8),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.speed, color: Colors.white, size: 16),
+                    SizedBox(width: 4),
+                    Text(
+                      'PACE',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                GestureDetector(
+                  onTap: toggleSlidePanel,
+                  child: Container(
+                    padding: EdgeInsets.all(2),
+                    child: Icon(Icons.close, color: Colors.white, size: 14),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Content area - pace calculator
+          Expanded(
+            child: _buildPaceCalculator(),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildPaceCalculator() {
+    return Padding(
+      padding: EdgeInsets.all(8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Pace input section
+          Text(
+            'Pace per km:',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          SizedBox(height: 8),
+          
+          // Pace display and slider control
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey[300]!),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Column(
+              children: [
+                // Current pace display - editable with drag control
+                _isEditingPace
+                    ? GestureDetector(
+                        onPanUpdate: (details) {
+                          // Horizontal drag to adjust pace
+                          final double sensitivity = 2.0; // Adjust sensitivity (lower = more sensitive)
+                          final double adjustment = details.delta.dx / sensitivity;
+                          if (adjustment.abs() > 0.5) {
+                            _adjustPaceValue(adjustment);
+                          }
+                        },
+                        onTap: () => _showPaceEditDialog(),
+                        child: Container(
+                          height: 28,
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Color.fromRGBO(243, 134, 32, 0.6), width: 1),
+                            borderRadius: BorderRadius.circular(4),
+                            color: Color.fromRGBO(243, 134, 32, 0.1),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Color.fromRGBO(243, 134, 32, 0.3),
+                                blurRadius: 2,
+                                offset: Offset(0, 1),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              // Left drag indicator
+                              Container(
+                                width: 10,
+                                height: 28,
+                                decoration: BoxDecoration(
+                                  color: Color.fromRGBO(243, 134, 32, 0.3),
+                                  borderRadius: BorderRadius.only(
+                                    topLeft: Radius.circular(3),
+                                    bottomLeft: Radius.circular(3),
+                                  ),
+                                ),
+                                child: Center(
+                                  child: Icon(
+                                    Icons.drag_indicator,
+                                    size: 8,
+                                    color: Color.fromRGBO(243, 134, 32, 1),
+                                  ),
+                                ),
+                              ),
+                              // Pace display with drag functionality
+                              Expanded(
+                                child: Container(
+                                  height: 28,
+                                  alignment: Alignment.center,
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.touch_app,
+                                        size: 12,
+                                        color: Color.fromRGBO(243, 134, 32, 1),
+                                      ),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        _formatPaceDisplay(_paceValue),
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color.fromRGBO(243, 134, 32, 1),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              // Right drag indicator
+                              Container(
+                                width: 10,
+                                height: 28,
+                                decoration: BoxDecoration(
+                                  color: Color.fromRGBO(243, 134, 32, 0.3),
+                                  borderRadius: BorderRadius.only(
+                                    topRight: Radius.circular(3),
+                                    bottomRight: Radius.circular(3),
+                                  ),
+                                ),
+                                child: Center(
+                                  child: Icon(
+                                    Icons.drag_indicator,
+                                    size: 8,
+                                    color: Color.fromRGBO(243, 134, 32, 1),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : GestureDetector(
+                        onTap: () => _startEditingPace(),
+                        onLongPress: () => _showPaceEditDialog(),
+                        child: Container(
+                          height: 24,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(3),
+                            color: Color.fromRGBO(243, 134, 32, 0.1),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.touch_app,
+                                size: 10,
+                                color: Color.fromRGBO(243, 134, 32, 0.7),
+                              ),
+                              SizedBox(width: 2),
+                              Text(
+                                _formatPaceDisplay(_paceValue),
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color.fromRGBO(243, 134, 32, 1),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                SizedBox(height: 4),
+                
+                // Slider for pace adjustment
+                Container(
+                  height: 30,
+                  child: SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      trackHeight: 4,
+                      thumbShape: RoundSliderThumbShape(enabledThumbRadius: 8),
+                      overlayShape: RoundSliderOverlayShape(overlayRadius: 16),
+                      activeTrackColor: Color.fromRGBO(243, 134, 32, 1),
+                      inactiveTrackColor: Colors.grey[300],
+                      thumbColor: Color.fromRGBO(243, 134, 32, 1),
+                      overlayColor: Color.fromRGBO(243, 134, 32, 0.2),
+                    ),
+                    child: Slider(
+                      value: _paceValue,
+                      min: 2.0,
+                      max: 10.0,
+                      divisions: 160, // Allows 3-second increments (8 minutes * 60 seconds / 3)
+                      onChanged: (value) {
+                        setState(() {
+                          _paceValue = value;
+                        });
+                      },
+                    ),
+                  ),
+                ),
+                
+                // Range indicator
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('2:00', style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+                    Text('10:00', style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          
+          SizedBox(height: 12),
+          
+          // Results section
+          Text(
+            'Times:',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          SizedBox(height: 4),
+          
+          Expanded(
+            child: Container(
+              width: double.infinity,
+              padding: EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: Colors.grey[200]!),
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: _buildDistanceResults(),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  List<Widget> _buildDistanceResults() {
+    final distances = [
+      {'name': '400m', 'meters': 400},
+      {'name': '550m', 'meters': 550},
+      {'name': '800m', 'meters': 800},
+      {'name': '1200m', 'meters': 1200},
+      {'name': '1400m', 'meters': 1400},
+      {'name': '1600m', 'meters': 1600},
+      {'name': '3km', 'meters': 3000},
+      {'name': '5km', 'meters': 5000},
+      {'name': '10km', 'meters': 10000},
+      {'name': 'Half', 'meters': 21097},
+      {'name': 'Full', 'meters': 42195},
+    ];
+    
+    return distances.map((distance) {
+      final distanceName = distance['name'] as String;
+      final distanceInMeters = distance['meters'] as int;
+      final timeInSeconds = _calculateTimeForDistance(distanceInMeters);
+      final formattedTime = _formatTimeFromSeconds(timeInSeconds);
+      final isEditing = _editingDistance == distanceName;
+      
+      return Padding(
+        padding: EdgeInsets.symmetric(vertical: 2),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              distanceName,
+              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w500), // Reduced back to 14 to prevent overflow
+            ),
+            isEditing 
+              ? GestureDetector(
+                  onPanUpdate: (details) {
+                    // Horizontal drag to adjust time
+                    final double sensitivity = 0.5; // Adjust sensitivity (lower = more sensitive)
+                    final int adjustment = (details.delta.dx / sensitivity).round();
+                    if (adjustment != 0) {
+                      _adjustDistanceTime(distanceName, distanceInMeters, adjustment);
+                    }
+                  },
+                  onTap: () => _showTimeEditDialog(distanceName, distanceInMeters, formattedTime),
+                  child: Container(
+                    constraints: BoxConstraints(
+                      maxWidth: 85, // Use constraints instead of fixed width
+                      minWidth: 70,
+                    ),
+                    height: 24,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Color.fromRGBO(243, 134, 32, 0.6), width: 1),
+                      borderRadius: BorderRadius.circular(3),
+                      color: Color.fromRGBO(243, 134, 32, 0.1),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Color.fromRGBO(243, 134, 32, 0.3),
+                          blurRadius: 2,
+                          offset: Offset(0, 1),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(3),
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          return Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // Left drag indicator
+                              Container(
+                                width: 5,
+                                height: 22,
+                                decoration: BoxDecoration(
+                                  color: Color.fromRGBO(243, 134, 32, 0.3),
+                                  borderRadius: BorderRadius.only(
+                                    topLeft: Radius.circular(2),
+                                    bottomLeft: Radius.circular(2),
+                                  ),
+                                ),
+                                child: Icon(
+                                  Icons.drag_indicator,
+                                  size: 3,
+                                  color: Color.fromRGBO(243, 134, 32, 1),
+                                ),
+                              ),
+                              // Time display with drag functionality - flexible middle section
+                              Expanded(
+                                child: Container(
+                                  height: 22,
+                                  constraints: BoxConstraints(
+                                    minWidth: 40, // Ensure minimum space for text
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Text(
+                                      formattedTime,
+                                      style: TextStyle(
+                                        fontSize: 10, // Reduced from 11 to 10 to prevent overflow
+                                        fontWeight: FontWeight.bold,
+                                        color: Color.fromRGBO(243, 134, 32, 1),
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.visible,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              // Right drag indicator
+                              Container(
+                                width: 5,
+                                height: 22,
+                                decoration: BoxDecoration(
+                                  color: Color.fromRGBO(243, 134, 32, 0.3),
+                                  borderRadius: BorderRadius.only(
+                                    topRight: Radius.circular(2),
+                                    bottomRight: Radius.circular(2),
+                                  ),
+                                ),
+                                child: Icon(
+                                  Icons.drag_indicator,
+                                  size: 3,
+                                  color: Color.fromRGBO(243, 134, 32, 1),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                )
+              : GestureDetector(
+                  onTap: () => _startEditingDistance(distanceName, formattedTime),
+                  onLongPress: () => _showTimeEditDialog(distanceName, distanceInMeters, formattedTime),
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(3),
+                      color: Color.fromRGBO(243, 134, 32, 0.1),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.touch_app,
+                          size: 8,
+                          color: Color.fromRGBO(243, 134, 32, 0.7),
+                        ),
+                        SizedBox(width: 2),
+                        Text(
+                          formattedTime,
+                          style: TextStyle(
+                            fontSize: 12, // Reduced from 14 to 12 to be consistent and prevent overflow
+                            fontWeight: FontWeight.bold,
+                            color: Color.fromRGBO(243, 134, 32, 1),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+          ],
+        ),
+      );
+    }).toList();
+  }
+  
+  double _calculateTimeForDistance(int distanceInMeters) {
+    // Convert pace value to seconds per meter
+    final pacePerKmInSeconds = _paceValue * 60; // Convert minutes to seconds
+    final pacePerMeterInSeconds = pacePerKmInSeconds / 1000.0;
+    
+    // Calculate total time for the distance
+    return distanceInMeters * pacePerMeterInSeconds;
+  }
+  
+  String _formatPaceDisplay(double paceValue) {
+    final minutes = paceValue.floor();
+    final seconds = ((paceValue - minutes) * 60).round();
+    return '${minutes}:${seconds.toString().padLeft(2, '0')}';
+  }
+  
+  String _formatTimeFromSeconds(double totalSeconds) {
+    final hours = (totalSeconds / 3600).floor();
+    final minutes = ((totalSeconds % 3600) / 60).floor();
+    final seconds = (totalSeconds % 60).floor();
+    
+    if (hours > 0) {
+      return '${hours}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+    } else {
+      return '${minutes}:${seconds.toString().padLeft(2, '0')}';
+    }
+  }
+  
+  void _finishEditingPace() {
+    setState(() {
+      _isEditingPace = false;
+      // Parse the entered pace value
+      final paceText = _paceController.text.trim();
+      final pacePattern = RegExp(r'^(\d+):([0-5]\d)$');
+      final match = pacePattern.firstMatch(paceText);
+      
+      if (match != null) {
+        final minutes = int.parse(match.group(1)!);
+        final seconds = int.parse(match.group(2)!);
+        final newPaceValue = minutes + (seconds / 60.0);
+        
+        // Clamp to valid range
+        _paceValue = newPaceValue.clamp(2.0, 10.0);
+      }
+      
+      // Update controller with formatted value
+      _paceController.text = _formatPaceDisplay(_paceValue);
+    });
+  }
+  
+  void _startEditingPace() {
+    setState(() {
+      _isEditingPace = true;
+      _paceController.text = _formatPaceDisplay(_paceValue);
+    });
+    _paceFocusNode.requestFocus();
+  }
+
+  void _adjustPaceValue(double adjustment) async {
+    final int currentPaceSeconds = (_paceValue * 60).round();
+    final int adjustmentSeconds = (adjustment * 3).round(); // 3 seconds per unit for sensitivity
+    final int newPaceSeconds = (currentPaceSeconds + adjustmentSeconds).clamp(120, 600); // 2:00 to 10:00
+    
+    setState(() {
+      _paceValue = newPaceSeconds / 60.0;
+    });
+    
+    // Throttled haptic feedback
+    final now = DateTime.now();
+    if (_lastHapticTime == null || now.difference(_lastHapticTime!).inMilliseconds > 50) {
+      HapticFeedback.selectionClick();
+      _lastHapticTime = now;
+    }
+  }
+
+  void _showPaceEditDialog() {
+    final TextEditingController dialogController = TextEditingController(
+      text: _formatPaceDisplay(_paceValue),
+    );
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Edit Pace per KM'),
+          content: TextField(
+            controller: dialogController,
+            decoration: InputDecoration(
+              labelText: 'Pace (MM:SS)',
+              hintText: 'e.g., 4:30',
+            ),
+            keyboardType: TextInputType.text,
+            autofocus: true,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                _updatePaceFromDialog(dialogController.text);
+                Navigator.of(context).pop();
+              },
+              child: Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _updatePaceFromDialog(String paceText) {
+    try {
+      final parts = paceText.split(':');
+      if (parts.length == 2) {
+        final minutes = int.parse(parts[0]);
+        final seconds = int.parse(parts[1]);
+        final totalMinutes = minutes + (seconds / 60.0);
+        final clampedPace = totalMinutes.clamp(2.0, 10.0);
+        
+        setState(() {
+          _paceValue = clampedPace;
+          _isEditingPace = false;
+        });
+      }
+    } catch (e) {
+      // Invalid format, ignore
+    }
+  }
+  
+  void _startEditingDistance(String distanceName, String currentTime) {
+    setState(() {
+      _editingDistance = distanceName;
+      _distanceControllers[distanceName]?.text = currentTime;
+    });
+  }
+  
+  void _adjustDistanceTime(String distanceName, int distanceInMeters, int adjustment) async {
+    // Add throttled haptic feedback for drag adjustments
+    if (adjustment != 0) {
+      final now = DateTime.now();
+      if (_lastDragTime == null || now.difference(_lastDragTime!).inMilliseconds > 100) {
+        await performHapticFeedback();
+        _lastDragTime = now;
+      }
+    }
+    
+    // Calculate current time for this distance
+    final currentTimeInSeconds = _calculateTimeForDistance(distanceInMeters);
+    
+    // Adjust time by 1 second increments
+    final newTimeInSeconds = (currentTimeInSeconds + adjustment).clamp(1.0, 86400.0); // Max 24 hours
+    
+    // Calculate new pace per km from this adjusted time
+    final newPacePerKmInSeconds = (newTimeInSeconds * 1000.0) / distanceInMeters;
+    final newPaceValue = newPacePerKmInSeconds / 60.0; // Convert to minutes
+    
+    // Update pace (this will automatically update all distance times)
+    setState(() {
+      _paceValue = newPaceValue.clamp(2.0, 10.0);
+      _paceController.text = _formatPaceDisplay(_paceValue);
+    });
+  }
+  
+  void _showTimeEditDialog(String distanceName, int distanceInMeters, String currentTime) {
+    final TextEditingController dialogController = TextEditingController(text: currentTime);
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Edit $distanceName Time', style: TextStyle(fontSize: 16)),
+          content: Container(
+            width: 200,
+            child: TextField(
+              controller: dialogController,
+              decoration: InputDecoration(
+                labelText: 'Time (MM:SS or H:MM:SS)',
+                border: OutlineInputBorder(),
+              ),
+              autofocus: true,
+              onSubmitted: (_) {
+                _updateTimeFromDialog(distanceName, distanceInMeters, dialogController.text);
+                Navigator.of(context).pop();
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                _updateTimeFromDialog(distanceName, distanceInMeters, dialogController.text);
+                Navigator.of(context).pop();
+              },
+              child: Text('Update'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+  
+  void _updateTimeFromDialog(String distanceName, int distanceInMeters, String timeText) {
+    final timeInSeconds = _parseTimeToSeconds(timeText.trim());
+    
+    if (timeInSeconds > 0) {
+      // Calculate new pace per km from this time
+      final newPacePerKmInSeconds = (timeInSeconds * 1000.0) / distanceInMeters;
+      final newPaceValue = newPacePerKmInSeconds / 60.0; // Convert to minutes
+      
+      // Update pace and exit editing mode
+      setState(() {
+        _paceValue = newPaceValue.clamp(2.0, 10.0);
+        _paceController.text = _formatPaceDisplay(_paceValue);
+        _editingDistance = null;
+      });
+    }
+  }
+  
+  // Helper function to parse time strings (MM:SS or H:MM:SS) to seconds
+  double _parseTimeToSeconds(String timeText) {
+    if (timeText.isEmpty) return 0.0;
+    
+    final parts = timeText.split(':');
+    double totalSeconds = 0.0;
+    
+    try {
+      if (parts.length == 2) {
+        // MM:SS format
+        final minutes = int.parse(parts[0]);
+        final seconds = int.parse(parts[1]);
+        totalSeconds = (minutes * 60) + seconds.toDouble();
+      } else if (parts.length == 3) {
+        // H:MM:SS format
+        final hours = int.parse(parts[0]);
+        final minutes = int.parse(parts[1]);
+        final seconds = int.parse(parts[2]);
+        totalSeconds = (hours * 3600) + (minutes * 60) + seconds.toDouble();
+      }
+    } catch (e) {
+      // Return 0 if parsing fails
+      return 0.0;
+    }
+    
+    return totalSeconds;
+  }
 }
+
 class LapEntry {
   final String lapTime;
   final String splitTime;
