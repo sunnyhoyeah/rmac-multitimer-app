@@ -378,7 +378,10 @@ class _TimerListState extends State<TimerList> {
 
   TimerState _getTimerState(int index) {
     String timerId = _getTimerStateId(index);
-    return timerStates[timerId] ?? TimerState(timerId);
+    if (!timerStates.containsKey(timerId)) {
+      timerStates[timerId] = TimerState(timerId);
+    }
+    return timerStates[timerId]!;
   }
 
   void _remapTimerStatesAfterReorder() {
@@ -445,6 +448,10 @@ class _TimerListState extends State<TimerList> {
       if (timerState != null) {
         _resetTimer(timerState);
       }
+    }
+    // Additional UI update after resetting all timers
+    if (mounted) {
+      setState(() {});
     }
   }
   
@@ -514,9 +521,15 @@ class _TimerListState extends State<TimerList> {
   }
   
   void _resetTimer(TimerState timerState) {
+    // Cancel any running timer first
     timerState.periodicTimer?.cancel();
+    timerState.periodicTimer = null;
+    
+    // Reset all stopwatch instances
     timerState.stopwatch.reset();
     timerState.lapStopwatch.reset();
+    
+    // Reset all state variables
     timerState.isRunning = false;
     timerState.timerValue = '00:00:00';
     timerState.currentLapTimeValue = '00:00:00';
@@ -524,6 +537,11 @@ class _TimerListState extends State<TimerList> {
     timerState.lapEntries.clear();
     timerState.currentLapNumber = 1;
     timerState.lapNumber = 0;
+    
+    // Force UI update to reflect reset state
+    if (mounted) {
+      setState(() {});
+    }
   }
   
   String _formatTime(int milliseconds) {
@@ -854,8 +872,7 @@ class _TimerListState extends State<TimerList> {
                                   rowColor: rowColor,
                                   timerState: _getTimerState(index),
                                   onNameChanged: (newName) {
-                                    runnerNames[index] = newName;
-                                    saveRunnerNames();
+                                    _updateRunnerName(index, newName);
                                   },
                                 ),
                               ),
@@ -885,8 +902,7 @@ class _TimerListState extends State<TimerList> {
                           rowColor: rowColor,
                           timerState: _getTimerState(index),
                           onNameChanged: (newName) {
-                            runnerNames[index] = newName;
-                            saveRunnerNames();
+                            _updateRunnerName(index, newName);
                           },
                         ),
                       ),
@@ -913,6 +929,26 @@ class _TimerListState extends State<TimerList> {
           },
         ),
     );
+  }
+
+  void _updateRunnerName(int index, String newName) {
+    // Get the current timer state before name change
+    String oldTimerId = _getTimerStateId(index);
+    TimerState? currentTimerState = timerStates[oldTimerId];
+    
+    // Update the runner name
+    runnerNames[index] = newName;
+    
+    // Update timer state mapping if timer state exists
+    if (currentTimerState != null) {
+      String newTimerId = _getTimerStateId(index);
+      
+      // Remove old mapping and add new mapping
+      timerStates.remove(oldTimerId);
+      timerStates[newTimerId] = currentTimerState;
+    }
+    
+    saveRunnerNames();
   }
 }
 class LapEntry {
@@ -1083,9 +1119,14 @@ class _TimerRowState extends State<TimerRow> {
                     backgroundColor: buttonColor, 
                   ),
                   onPressed: () async {
-                    // Use comprehensive haptic feedback
-                    await performHapticFeedback();
-                    timerState.isRunning ? stopTimer() : startTimer();
+                    // Use comprehensive haptic feedback but don't block the timer action
+                    performHapticFeedback(); // Remove await to not block the action
+                    
+                    if (timerState.isRunning) {
+                      stopTimer();
+                    } else {
+                      startTimer();
+                    }
                   },
                   child: Text(
                     timerState.isRunning ? 'Stop' : 'Start',
@@ -1113,9 +1154,14 @@ class _TimerRowState extends State<TimerRow> {
                     backgroundColor: buttonColor, 
                   ),
                   onPressed: () async {
-                    // Use comprehensive haptic feedback
-                    await performHapticFeedback();
-                    timerState.isRunning ? takeLapTime() : resetTimer();
+                    // Use comprehensive haptic feedback but don't block the reset action
+                    performHapticFeedback(); // Remove await to not block the action
+                    
+                    if (timerState.isRunning) {
+                      takeLapTime();
+                    } else {
+                      resetTimer();
+                    }
                   },
                   child: Text(
                     timerState.isRunning ? 'Lap' : 'Reset',
