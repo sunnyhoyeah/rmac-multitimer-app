@@ -15,18 +15,21 @@ class AppUpdateManager {
       return 'https://your-domain.com/rmac-android-version.json';
     }
   }
-  
+
   // Store URLs for different platforms
-  static const String _iosAppStoreUrl = 'https://apps.apple.com/app/rmac-multitimer/id1234567890';
-  static const String _androidPlayStoreUrl = 'https://play.google.com/store/apps/details?id=com.rmac.multitimer';
-  
+  static const String _iosAppStoreUrl =
+      'https://apps.apple.com/app/rmac-multitimer/id1234567890';
+  static const String _androidPlayStoreUrl =
+      'https://play.google.com/store/apps/details?id=com.rmac.multitimer';
+
   /// Check for app updates and show appropriate dialog
-  static Future<void> checkForUpdates(BuildContext context, {bool showNoUpdateDialog = false}) async {
+  static Future<void> checkForUpdates(BuildContext context,
+      {bool showNoUpdateDialog = false}) async {
     try {
       final updateInfo = await _fetchUpdateInfo();
       if (updateInfo != null) {
         final currentVersion = await _getCurrentVersion();
-        
+
         if (_shouldShowUpdateDialog(currentVersion, updateInfo)) {
           if (context.mounted) {
             _showUpdateDialog(context, updateInfo);
@@ -42,7 +45,7 @@ class AppUpdateManager {
       // Silently fail - don't interrupt user experience
     }
   }
-  
+
   /// Fetch update information from your backend/API
   static Future<UpdateInfo?> _fetchUpdateInfo() async {
     try {
@@ -51,7 +54,7 @@ class AppUpdateManager {
         Uri.parse(_updateCheckUrl),
         headers: {'Content-Type': 'application/json'},
       ).timeout(Duration(seconds: 10));
-      
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         return UpdateInfo.fromJson(data);
@@ -63,46 +66,48 @@ class AppUpdateManager {
     }
     return null;
   }
-  
+
   /// Get current app version
   static Future<String> _getCurrentVersion() async {
     final packageInfo = await PackageInfo.fromPlatform();
     return packageInfo.version;
   }
-  
+
   /// Determine if update dialog should be shown
-  static bool _shouldShowUpdateDialog(String currentVersion, UpdateInfo updateInfo) {
+  static bool _shouldShowUpdateDialog(
+      String currentVersion, UpdateInfo updateInfo) {
     final current = _parseVersion(currentVersion);
     final latest = _parseVersion(updateInfo.latestVersion);
-    
+
     // Show dialog if current version is less than latest
     return _compareVersions(current, latest) < 0;
   }
-  
+
   /// Parse version string into comparable format
   static List<int> _parseVersion(String version) {
     return version.split('.').map((e) => int.tryParse(e) ?? 0).toList();
   }
-  
+
   /// Compare two version arrays
   static int _compareVersions(List<int> version1, List<int> version2) {
-    final maxLength = [version1.length, version2.length].reduce((a, b) => a > b ? a : b);
-    
+    final maxLength =
+        [version1.length, version2.length].reduce((a, b) => a > b ? a : b);
+
     for (int i = 0; i < maxLength; i++) {
       final v1 = i < version1.length ? version1[i] : 0;
       final v2 = i < version2.length ? version2[i] : 0;
-      
+
       if (v1 < v2) return -1;
       if (v1 > v2) return 1;
     }
     return 0;
   }
-  
+
   /// Show update dialog
   static void _showUpdateDialog(BuildContext context, UpdateInfo updateInfo) {
     Future<String> currentVersionFuture = _getCurrentVersion();
     final isForceUpdate = _isForceUpdate(updateInfo);
-    
+
     showDialog(
       context: context,
       barrierDismissible: !isForceUpdate,
@@ -128,9 +133,9 @@ class AppUpdateManager {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    isForceUpdate 
-                      ? 'A critical update is required to continue using the app.'
-                      : 'A new version of RMAC MultiTimer is available!',
+                    isForceUpdate
+                        ? 'A critical update is required to continue using the app.'
+                        : 'A new version of RMAC MultiTimer is available!',
                     style: TextStyle(fontSize: 16),
                   ),
                   SizedBox(height: 12),
@@ -138,7 +143,8 @@ class AppUpdateManager {
                   Text('Latest Version: ${updateInfo.latestVersion}'),
                   if (updateInfo.releaseNotes.isNotEmpty) ...[
                     SizedBox(height: 12),
-                    Text('What\'s New:', style: TextStyle(fontWeight: FontWeight.bold)),
+                    Text('What\'s New:',
+                        style: TextStyle(fontWeight: FontWeight.bold)),
                     SizedBox(height: 4),
                     Container(
                       height: 100,
@@ -166,12 +172,12 @@ class AppUpdateManager {
       ),
     );
   }
-  
+
   /// Check if this is a force update
   static bool _isForceUpdate(UpdateInfo updateInfo) {
     return updateInfo.forceUpdate;
   }
-  
+
   /// Show no update available dialog
   static void _showNoUpdateDialog(BuildContext context) {
     showDialog(
@@ -194,13 +200,13 @@ class AppUpdateManager {
       ),
     );
   }
-  
+
   /// Open appropriate app store
   static Future<void> _openAppStore() async {
-    final url = defaultTargetPlatform == TargetPlatform.iOS 
-        ? _iosAppStoreUrl 
+    final url = defaultTargetPlatform == TargetPlatform.iOS
+        ? _iosAppStoreUrl
         : _androidPlayStoreUrl;
-    
+
     if (await canLaunchUrl(Uri.parse(url))) {
       await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
     }
@@ -214,7 +220,7 @@ class UpdateInfo {
   final bool forceUpdate;
   final String releaseNotes;
   final String downloadUrl;
-  
+
   UpdateInfo({
     required this.latestVersion,
     required this.minimumVersion,
@@ -222,7 +228,7 @@ class UpdateInfo {
     required this.releaseNotes,
     required this.downloadUrl,
   });
-  
+
   factory UpdateInfo.fromJson(Map<String, dynamic> json) {
     return UpdateInfo(
       latestVersion: json['latest_version'] ?? '',

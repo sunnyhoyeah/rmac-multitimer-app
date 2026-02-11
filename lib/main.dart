@@ -502,11 +502,12 @@ class _TimerListState extends State<TimerList>
   bool _isEditingPace = false;
   late TextEditingController _paceController;
   late FocusNode _paceFocusNode;
-  
+
   // Custom distance for the first row (default 100m)
   int _customDistance = 100;
   bool _isEditingCustomDistance = false;
-  final TextEditingController _customDistanceController = TextEditingController();
+  final TextEditingController _customDistanceController =
+      TextEditingController();
   final FocusNode _customDistanceFocusNode = FocusNode();
 
   // Controllers and state for editable distance times
@@ -2968,66 +2969,67 @@ class _TimerListState extends State<TimerList>
     return GestureDetector(
       onHorizontalDragEnd: (details) {
         // Swipe from right to left to close (negative velocity)
-        if (details.primaryVelocity != null && details.primaryVelocity! < -500) {
+        if (details.primaryVelocity != null &&
+            details.primaryVelocity! < -500) {
           toggleSlidePanel();
         }
       },
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.2),
-            blurRadius: 8,
-            offset: Offset(2, 0),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          // Header - compact for narrow panel
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-            decoration: BoxDecoration(
-              color: Color.fromRGBO(243, 134, 32, 1),
-              borderRadius: BorderRadius.only(
-                bottomLeft: Radius.circular(8),
-                bottomRight: Radius.circular(8),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 8,
+              offset: Offset(2, 0),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            // Header - compact for narrow panel
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+              decoration: BoxDecoration(
+                color: Color.fromRGBO(243, 134, 32, 1),
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(8),
+                  bottomRight: Radius.circular(8),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.speed, color: Colors.white, size: 16),
+                      SizedBox(width: 4),
+                      Text(
+                        'PACE',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  GestureDetector(
+                    onTap: toggleSlidePanel,
+                    child: Container(
+                      padding: EdgeInsets.all(2),
+                      child: Icon(Icons.close, color: Colors.white, size: 14),
+                    ),
+                  ),
+                ],
               ),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.speed, color: Colors.white, size: 16),
-                    SizedBox(width: 4),
-                    Text(
-                      'PACE',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                GestureDetector(
-                  onTap: toggleSlidePanel,
-                  child: Container(
-                    padding: EdgeInsets.all(2),
-                    child: Icon(Icons.close, color: Colors.white, size: 14),
-                  ),
-                ),
-              ],
+            // Main pace calculator content
+            Expanded(
+              child: _buildPaceCalculator(),
             ),
-          ),
-          // Main pace calculator content
-          Expanded(
-            child: _buildPaceCalculator(),
-          ),
-        ],
-      ),
+          ],
+        ),
       ),
     );
   }
@@ -3281,15 +3283,35 @@ class _TimerListState extends State<TimerList>
 
     // Pace multipliers based on training zones (relative to base pace)
     final paceTypes = [
-      {'label': 'E', 'multiplier': 1.15, 'color': Color.fromRGBO(76, 175, 80, 1)}, // Easy: slower
-      {'label': 'M', 'multiplier': 1.0, 'color': Color.fromRGBO(243, 134, 32, 1)}, // Marathon: base pace
-      {'label': 'T', 'multiplier': 0.93, 'color': Color.fromRGBO(255, 152, 0, 1)}, // Threshold: faster
-      {'label': 'I', 'multiplier': 0.88, 'color': Color.fromRGBO(255, 87, 34, 1)}, // Interval: much faster
-      {'label': 'R', 'multiplier': 0.83, 'color': Color.fromRGBO(244, 67, 54, 1)}, // Repetition: fastest
+      {
+        'label': 'E',
+        'multiplier': 1.15,
+        'color': Color.fromRGBO(76, 175, 80, 1)
+      }, // Easy: slower
+      {
+        'label': 'M',
+        'multiplier': 1.0,
+        'color': Color.fromRGBO(243, 134, 32, 1)
+      }, // Marathon: base pace
+      {
+        'label': 'T',
+        'multiplier': 0.93,
+        'color': Color.fromRGBO(255, 152, 0, 1)
+      }, // Threshold: faster
+      {
+        'label': 'I',
+        'multiplier': 0.88,
+        'color': Color.fromRGBO(255, 87, 34, 1)
+      }, // Interval: much faster
+      {
+        'label': 'R',
+        'multiplier': 0.83,
+        'color': Color.fromRGBO(244, 67, 54, 1)
+      }, // Repetition: fastest
     ];
 
     List<Widget> results = [];
-    
+
     // Header row
     results.add(
       Padding(
@@ -3300,7 +3322,10 @@ class _TimerListState extends State<TimerList>
               width: 50,
               child: Text(
                 'Dist',
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey[700]),
+                style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey[700]),
               ),
             ),
             ...paceTypes.map((paceType) {
@@ -3330,7 +3355,8 @@ class _TimerListState extends State<TimerList>
       final distance = distances[i];
       final distanceName = distance['name'] as String;
       final distanceInMeters = distance['meters'] as int;
-      final bool isCustomDistance = i == 0; // First distance is always the custom editable one
+      final bool isCustomDistance =
+          i == 0; // First distance is always the custom editable one
 
       results.add(
         Padding(
@@ -3340,79 +3366,86 @@ class _TimerListState extends State<TimerList>
               SizedBox(
                 width: 50,
                 child: isCustomDistance
-                  ? Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _customDistanceController,
-                            focusNode: _customDistanceFocusNode,
-                            keyboardType: TextInputType.number,
-                            textAlign: TextAlign.left,
+                    ? Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _customDistanceController,
+                              focusNode: _customDistanceFocusNode,
+                              keyboardType: TextInputType.number,
+                              textAlign: TextAlign.left,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                decoration: TextDecoration.underline,
+                                decorationColor:
+                                    Color.fromRGBO(243, 134, 32, 1),
+                                decorationThickness: 1.5,
+                              ),
+                              decoration: InputDecoration(
+                                contentPadding: EdgeInsets.zero,
+                                isDense: true,
+                                border: InputBorder.none,
+                              ),
+                              onTap: () {
+                                _customDistanceController.selection =
+                                    TextSelection(
+                                  baseOffset: 0,
+                                  extentOffset:
+                                      _customDistanceController.text.length,
+                                );
+                              },
+                              onSubmitted: (value) {
+                                final newDistance = int.tryParse(value);
+                                if (newDistance != null && newDistance > 0) {
+                                  setState(() {
+                                    _customDistance = newDistance;
+                                  });
+                                } else {
+                                  _customDistanceController.text =
+                                      _customDistance.toString();
+                                }
+                                _customDistanceFocusNode.unfocus();
+                              },
+                              onTapOutside: (_) {
+                                final newDistance = int.tryParse(
+                                    _customDistanceController.text);
+                                if (newDistance != null && newDistance > 0) {
+                                  setState(() {
+                                    _customDistance = newDistance;
+                                  });
+                                } else {
+                                  _customDistanceController.text =
+                                      _customDistance.toString();
+                                }
+                                _customDistanceFocusNode.unfocus();
+                              },
+                            ),
+                          ),
+                          Text(
+                            'm',
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
-                              decoration: TextDecoration.underline,
-                              decorationColor: Color.fromRGBO(243, 134, 32, 1),
-                              decorationThickness: 1.5,
                             ),
-                            decoration: InputDecoration(
-                              contentPadding: EdgeInsets.zero,
-                              isDense: true,
-                              border: InputBorder.none,
-                            ),
-                            onTap: () {
-                              _customDistanceController.selection = TextSelection(
-                                baseOffset: 0,
-                                extentOffset: _customDistanceController.text.length,
-                              );
-                            },
-                            onSubmitted: (value) {
-                              final newDistance = int.tryParse(value);
-                              if (newDistance != null && newDistance > 0) {
-                                setState(() {
-                                  _customDistance = newDistance;
-                                });
-                              } else {
-                                _customDistanceController.text = _customDistance.toString();
-                              }
-                              _customDistanceFocusNode.unfocus();
-                            },
-                            onTapOutside: (_) {
-                              final newDistance = int.tryParse(_customDistanceController.text);
-                              if (newDistance != null && newDistance > 0) {
-                                setState(() {
-                                  _customDistance = newDistance;
-                                });
-                              } else {
-                                _customDistanceController.text = _customDistance.toString();
-                              }
-                              _customDistanceFocusNode.unfocus();
-                            },
                           ),
+                        ],
+                      )
+                    : Text(
+                        distanceName,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
                         ),
-                        Text(
-                          'm',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    )
-                  : Text(
-                      distanceName,
-                      style: TextStyle(
-                        fontSize: 13, 
-                        fontWeight: FontWeight.w600,
                       ),
-                    ),
               ),
               ...paceTypes.map((paceType) {
                 final multiplier = paceType['multiplier'] as double;
                 final adjustedPace = _paceValue * multiplier;
-                final timeInSeconds = _calculateTimeForDistanceWithPace(distanceInMeters, adjustedPace);
+                final timeInSeconds = _calculateTimeForDistanceWithPace(
+                    distanceInMeters, adjustedPace);
                 final formattedTime = _formatTimeFromSeconds(timeInSeconds);
-                
+
                 return Expanded(
                   child: Center(
                     child: Text(
@@ -3436,14 +3469,39 @@ class _TimerListState extends State<TimerList>
     results.add(SizedBox(height: 6));
     results.add(Divider(height: 1, thickness: 1, color: Colors.grey[400]));
     results.add(SizedBox(height: 4));
-    
+
     // Add pace type definitions
     final definitions = [
-      {'label': 'E', 'name': 'Easy Pace', 'desc': '+15% slower (recovery runs)', 'color': Color.fromRGBO(76, 175, 80, 1)},
-      {'label': 'M', 'name': 'Marathon Pace', 'desc': 'Base pace (race pace)', 'color': Color.fromRGBO(243, 134, 32, 1)},
-      {'label': 'T', 'name': 'Threshold Pace', 'desc': '7% faster (tempo runs)', 'color': Color.fromRGBO(255, 152, 0, 1)},
-      {'label': 'I', 'name': 'Interval Pace', 'desc': '12% faster (speed work)', 'color': Color.fromRGBO(255, 87, 34, 1)},
-      {'label': 'R', 'name': 'Repetition Pace', 'desc': '17% faster (max effort)', 'color': Color.fromRGBO(244, 67, 54, 1)},
+      {
+        'label': 'E',
+        'name': 'Easy Pace',
+        'desc': '+15% slower (recovery runs)',
+        'color': Color.fromRGBO(76, 175, 80, 1)
+      },
+      {
+        'label': 'M',
+        'name': 'Marathon Pace',
+        'desc': 'Base pace (race pace)',
+        'color': Color.fromRGBO(243, 134, 32, 1)
+      },
+      {
+        'label': 'T',
+        'name': 'Threshold Pace',
+        'desc': '7% faster (tempo runs)',
+        'color': Color.fromRGBO(255, 152, 0, 1)
+      },
+      {
+        'label': 'I',
+        'name': 'Interval Pace',
+        'desc': '12% faster (speed work)',
+        'color': Color.fromRGBO(255, 87, 34, 1)
+      },
+      {
+        'label': 'R',
+        'name': 'Repetition Pace',
+        'desc': '17% faster (max effort)',
+        'color': Color.fromRGBO(244, 67, 54, 1)
+      },
     ];
 
     for (var def in definitions) {
@@ -3511,7 +3569,8 @@ class _TimerListState extends State<TimerList>
     return GestureDetector(
       onHorizontalDragEnd: (details) {
         // Swipe from right to left to close (negative velocity)
-        if (details.primaryVelocity != null && details.primaryVelocity! < -500) {
+        if (details.primaryVelocity != null &&
+            details.primaryVelocity! < -500) {
           toggleLapSlidePanel();
         }
       },
@@ -3528,53 +3587,54 @@ class _TimerListState extends State<TimerList>
         ),
         child: SafeArea(
           child: Column(
-          children: [
-            // Header - full width for full screen
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: Color.fromRGBO(243, 134, 32, 1), // Orange color for LAP
-                borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(12),
-                  bottomRight: Radius.circular(12),
+            children: [
+              // Header - full width for full screen
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color:
+                      Color.fromRGBO(243, 134, 32, 1), // Orange color for LAP
+                  borderRadius: BorderRadius.only(
+                    bottomLeft: Radius.circular(12),
+                    bottomRight: Radius.circular(12),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.timer, color: Colors.white, size: 22),
+                        SizedBox(width: 8),
+                        Text(
+                          'LAP TIMES',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    GestureDetector(
+                      onTap: toggleLapSlidePanel,
+                      child: Container(
+                        padding: EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Icon(Icons.close, color: Colors.white, size: 20),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.timer, color: Colors.white, size: 22),
-                      SizedBox(width: 8),
-                      Text(
-                        'LAP TIMES',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  GestureDetector(
-                    onTap: toggleLapSlidePanel,
-                    child: Container(
-                      padding: EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Icon(Icons.close, color: Colors.white, size: 20),
-                    ),
-                  ),
-                ],
+              // Main lap times content
+              Expanded(
+                child: _buildLapContent(),
               ),
-            ),
-            // Main lap times content
-            Expanded(
-              child: _buildLapContent(),
-            ),
-          ],
+            ],
           ),
         ),
       ),
@@ -4259,7 +4319,8 @@ class _TimerListState extends State<TimerList>
             animation: Listenable.merge([_slideAnimation, _lapSlideAnimation]),
             builder: (context, child) {
               // Only show tab when both drawers are closed
-              bool bothClosed = _slideAnimation.value < 0.1 && _lapSlideAnimation.value < 0.1;
+              bool bothClosed =
+                  _slideAnimation.value < 0.1 && _lapSlideAnimation.value < 0.1;
               if (!bothClosed) return SizedBox.shrink();
 
               return Positioned(
@@ -4304,7 +4365,8 @@ class _TimerListState extends State<TimerList>
             animation: Listenable.merge([_slideAnimation, _lapSlideAnimation]),
             builder: (context, child) {
               // Only show tab when both drawers are closed
-              bool bothClosed = _slideAnimation.value < 0.1 && _lapSlideAnimation.value < 0.1;
+              bool bothClosed =
+                  _slideAnimation.value < 0.1 && _lapSlideAnimation.value < 0.1;
               if (!bothClosed) return SizedBox.shrink();
 
               return Positioned(
@@ -4977,7 +5039,8 @@ class LapTimesPage extends StatelessWidget {
   final List<LapEntry> lapEntries;
   final String runnerName;
 
-  const LapTimesPage({super.key, required this.lapEntries, required this.runnerName});
+  const LapTimesPage(
+      {super.key, required this.lapEntries, required this.runnerName});
 
   @override
   Widget build(BuildContext context) {
