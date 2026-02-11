@@ -21,7 +21,7 @@ Implemented a robust dual-storage persistence system that ensures user data surv
 3. **Automatic Migration**
    - If document directory is empty but SharedPreferences has data, automatically migrates
    - Ensures existing users don't lose their custom runner names during first update
-
+sert 
 4. **Enhanced Error Handling**
    - Try-catch blocks around all persistence operations
    - Graceful fallback if either storage method fails

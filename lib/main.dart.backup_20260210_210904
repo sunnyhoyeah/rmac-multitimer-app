@@ -502,12 +502,6 @@ class _TimerListState extends State<TimerList>
   bool _isEditingPace = false;
   late TextEditingController _paceController;
   late FocusNode _paceFocusNode;
-  
-  // Custom distance for the first row (default 100m)
-  int _customDistance = 100;
-  bool _isEditingCustomDistance = false;
-  final TextEditingController _customDistanceController = TextEditingController();
-  final FocusNode _customDistanceFocusNode = FocusNode();
 
   // Controllers and state for editable distance times
   Map<String, TextEditingController> _distanceControllers = {};
@@ -569,18 +563,11 @@ class _TimerListState extends State<TimerList>
       }
     });
 
-    // Initialize custom distance controller
-    _customDistanceController.text = _customDistance.toString();
-
     // Initialize distance time controllers
     final distances = [
-      '100m',
-      '200m',
-      '300m',
       '400m',
       '550m',
       '800m',
-      '1km',
       '1200m',
       '1400m',
       '1600m',
@@ -2710,6 +2697,15 @@ class _TimerListState extends State<TimerList>
     }
   }
 
+  double _calculateTimeForDistance(int distanceInMeters) {
+    // Convert pace value to seconds per meter
+    final pacePerKmInSeconds = _paceValue * 60; // Convert minutes to seconds
+    final pacePerMeterInSeconds = pacePerKmInSeconds / 1000.0;
+
+    // Calculate total time for the distance
+    return distanceInMeters * pacePerMeterInSeconds;
+  }
+
   void _finishEditingPace() {
     setState(() {
       _isEditingPace = false;
@@ -2965,16 +2961,9 @@ class _TimerListState extends State<TimerList>
   }
 
   Widget _buildSlidePanel() {
-    return GestureDetector(
-      onHorizontalDragEnd: (details) {
-        // Swipe from right to left to close (negative velocity)
-        if (details.primaryVelocity != null && details.primaryVelocity! < -500) {
-          toggleSlidePanel();
-        }
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.2),
@@ -3028,13 +3017,12 @@ class _TimerListState extends State<TimerList>
           ),
         ],
       ),
-      ),
     );
   }
 
   Widget _buildPaceCalculator() {
     return Padding(
-      padding: EdgeInsets.all(6),
+      padding: EdgeInsets.all(8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -3042,15 +3030,15 @@ class _TimerListState extends State<TimerList>
           Text(
             'Pace per km:',
             style: TextStyle(
-              fontSize: 11,
+              fontSize: 13,
               fontWeight: FontWeight.bold,
             ),
           ),
-          SizedBox(height: 4),
+          SizedBox(height: 8),
 
           // Pace display and slider control
           Container(
-            padding: EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             decoration: BoxDecoration(
               border: Border.all(color: Colors.grey[300]!),
               borderRadius: BorderRadius.circular(4),
@@ -3072,7 +3060,7 @@ class _TimerListState extends State<TimerList>
                         },
                         onTap: () => _showPaceEditDialog(),
                         child: Container(
-                          height: 24,
+                          height: 28,
                           decoration: BoxDecoration(
                             border: Border.all(
                                 color: Color.fromRGBO(243, 134, 32, 0.6),
@@ -3092,7 +3080,7 @@ class _TimerListState extends State<TimerList>
                               // Left drag indicator
                               Container(
                                 width: 10,
-                                height: 24,
+                                height: 28,
                                 decoration: BoxDecoration(
                                   color: Color.fromRGBO(243, 134, 32, 0.3),
                                   borderRadius: BorderRadius.only(
@@ -3111,7 +3099,7 @@ class _TimerListState extends State<TimerList>
                               // Pace display with drag functionality
                               Expanded(
                                 child: Container(
-                                  height: 24,
+                                  height: 28,
                                   alignment: Alignment.center,
                                   child: Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
@@ -3138,7 +3126,7 @@ class _TimerListState extends State<TimerList>
                               // Right drag indicator
                               Container(
                                 width: 10,
-                                height: 24,
+                                height: 28,
                                 decoration: BoxDecoration(
                                   color: Color.fromRGBO(243, 134, 32, 0.3),
                                   borderRadius: BorderRadius.only(
@@ -3235,9 +3223,18 @@ class _TimerListState extends State<TimerList>
             ),
           ),
 
-          SizedBox(height: 8),
+          SizedBox(height: 12),
 
           // Results section
+          Text(
+            'Times:',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          SizedBox(height: 4),
+
           Expanded(
             child: Container(
               width: double.infinity,
@@ -3262,13 +3259,9 @@ class _TimerListState extends State<TimerList>
 
   List<Widget> _buildDistanceResults() {
     final distances = [
-      {'name': '${_customDistance}m', 'meters': _customDistance},
-      {'name': '200m', 'meters': 200},
-      {'name': '300m', 'meters': 300},
       {'name': '400m', 'meters': 400},
       {'name': '550m', 'meters': 550},
       {'name': '800m', 'meters': 800},
-      {'name': '1km', 'meters': 1000},
       {'name': '1200m', 'meters': 1200},
       {'name': '1400m', 'meters': 1400},
       {'name': '1600m', 'meters': 1600},
@@ -3279,261 +3272,185 @@ class _TimerListState extends State<TimerList>
       {'name': 'Full', 'meters': 42195},
     ];
 
-    // Pace multipliers based on training zones (relative to base pace)
-    final paceTypes = [
-      {'label': 'E', 'multiplier': 1.15, 'color': Color.fromRGBO(76, 175, 80, 1)}, // Easy: slower
-      {'label': 'M', 'multiplier': 1.0, 'color': Color.fromRGBO(243, 134, 32, 1)}, // Marathon: base pace
-      {'label': 'T', 'multiplier': 0.93, 'color': Color.fromRGBO(255, 152, 0, 1)}, // Threshold: faster
-      {'label': 'I', 'multiplier': 0.88, 'color': Color.fromRGBO(255, 87, 34, 1)}, // Interval: much faster
-      {'label': 'R', 'multiplier': 0.83, 'color': Color.fromRGBO(244, 67, 54, 1)}, // Repetition: fastest
-    ];
-
-    List<Widget> results = [];
-    
-    // Header row
-    results.add(
-      Padding(
-        padding: EdgeInsets.symmetric(vertical: 2),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 50,
-              child: Text(
-                'Dist',
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey[700]),
-              ),
-            ),
-            ...paceTypes.map((paceType) {
-              return Expanded(
-                child: Center(
-                  child: Text(
-                    paceType['label'] as String,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: paceType['color'] as Color,
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
-          ],
-        ),
-      ),
-    );
-
-    // Divider
-    results.add(Divider(height: 1, thickness: 1, color: Colors.grey[300]));
-
-    // Distance rows
-    for (var i = 0; i < distances.length; i++) {
-      final distance = distances[i];
+    return distances.map((distance) {
       final distanceName = distance['name'] as String;
       final distanceInMeters = distance['meters'] as int;
-      final bool isCustomDistance = i == 0; // First distance is always the custom editable one
+      final timeInSeconds = _calculateTimeForDistance(distanceInMeters);
+      final formattedTime = _formatTimeFromSeconds(timeInSeconds);
+      final isEditing = _editingDistance == distanceName;
 
-      results.add(
-        Padding(
-          padding: EdgeInsets.symmetric(vertical: 1.5),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 50,
-                child: isCustomDistance
-                  ? Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _customDistanceController,
-                            focusNode: _customDistanceFocusNode,
-                            keyboardType: TextInputType.number,
-                            textAlign: TextAlign.left,
+      return Padding(
+        padding: EdgeInsets.symmetric(vertical: 2),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              distanceName,
+              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w500),
+            ),
+            isEditing
+                ? GestureDetector(
+                    onPanUpdate: (details) {
+                      // Horizontal drag to adjust time
+                      final double sensitivity = 0.5;
+                      final int adjustment =
+                          (details.delta.dx / sensitivity).round();
+                      if (adjustment != 0) {
+                        _adjustDistanceTime(
+                            distanceName, distanceInMeters, adjustment);
+                      }
+                    },
+                    onTap: () => _showTimeEditDialog(
+                        distanceName, distanceInMeters, formattedTime),
+                    child: Container(
+                      constraints: BoxConstraints(
+                        maxWidth: 85,
+                        minWidth: 70,
+                      ),
+                      height: 24,
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                            color: Color.fromRGBO(243, 134, 32, 0.6), width: 1),
+                        borderRadius: BorderRadius.circular(3),
+                        color: Color.fromRGBO(243, 134, 32, 0.1),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Color.fromRGBO(243, 134, 32, 0.3),
+                            blurRadius: 2,
+                            offset: Offset(0, 1),
+                          ),
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(3),
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            return Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                // Left drag indicator
+                                Container(
+                                  width: 5,
+                                  height: 22,
+                                  decoration: BoxDecoration(
+                                    color: Color.fromRGBO(243, 134, 32, 0.3),
+                                    borderRadius: BorderRadius.only(
+                                      topLeft: Radius.circular(2),
+                                      bottomLeft: Radius.circular(2),
+                                    ),
+                                  ),
+                                  child: Icon(
+                                    Icons.drag_indicator,
+                                    size: 3,
+                                    color: Color.fromRGBO(243, 134, 32, 1),
+                                  ),
+                                ),
+                                // Time display with drag functionality
+                                Expanded(
+                                  child: Container(
+                                    height: 22,
+                                    constraints: BoxConstraints(
+                                      minWidth: 40,
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      child: Text(
+                                        formattedTime,
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                          color:
+                                              Color.fromRGBO(243, 134, 32, 1),
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.visible,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                // Right drag indicator
+                                Container(
+                                  width: 5,
+                                  height: 22,
+                                  decoration: BoxDecoration(
+                                    color: Color.fromRGBO(243, 134, 32, 0.3),
+                                    borderRadius: BorderRadius.only(
+                                      topRight: Radius.circular(2),
+                                      bottomRight: Radius.circular(2),
+                                    ),
+                                  ),
+                                  child: Icon(
+                                    Icons.drag_indicator,
+                                    size: 3,
+                                    color: Color.fromRGBO(243, 134, 32, 1),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  )
+                : GestureDetector(
+                    onTap: () =>
+                        _startEditingDistance(distanceName, formattedTime),
+                    onLongPress: () => _showTimeEditDialog(
+                        distanceName, distanceInMeters, formattedTime),
+                    child: Container(
+                      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(3),
+                        color: Color.fromRGBO(243, 134, 32, 0.1),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.touch_app,
+                            size: 8,
+                            color: Color.fromRGBO(243, 134, 32, 0.7),
+                          ),
+                          SizedBox(width: 2),
+                          Text(
+                            formattedTime,
                             style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              decoration: TextDecoration.underline,
-                              decorationColor: Color.fromRGBO(243, 134, 32, 1),
-                              decorationThickness: 1.5,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Color.fromRGBO(243, 134, 32, 1),
                             ),
-                            decoration: InputDecoration(
-                              contentPadding: EdgeInsets.zero,
-                              isDense: true,
-                              border: InputBorder.none,
-                            ),
-                            onTap: () {
-                              _customDistanceController.selection = TextSelection(
-                                baseOffset: 0,
-                                extentOffset: _customDistanceController.text.length,
-                              );
-                            },
-                            onSubmitted: (value) {
-                              final newDistance = int.tryParse(value);
-                              if (newDistance != null && newDistance > 0) {
-                                setState(() {
-                                  _customDistance = newDistance;
-                                });
-                              } else {
-                                _customDistanceController.text = _customDistance.toString();
-                              }
-                              _customDistanceFocusNode.unfocus();
-                            },
-                            onTapOutside: (_) {
-                              final newDistance = int.tryParse(_customDistanceController.text);
-                              if (newDistance != null && newDistance > 0) {
-                                setState(() {
-                                  _customDistance = newDistance;
-                                });
-                              } else {
-                                _customDistanceController.text = _customDistance.toString();
-                              }
-                              _customDistanceFocusNode.unfocus();
-                            },
                           ),
-                        ),
-                        Text(
-                          'm',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    )
-                  : Text(
-                      distanceName,
-                      style: TextStyle(
-                        fontSize: 13, 
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-              ),
-              ...paceTypes.map((paceType) {
-                final multiplier = paceType['multiplier'] as double;
-                final adjustedPace = _paceValue * multiplier;
-                final timeInSeconds = _calculateTimeForDistanceWithPace(distanceInMeters, adjustedPace);
-                final formattedTime = _formatTimeFromSeconds(timeInSeconds);
-                
-                return Expanded(
-                  child: Center(
-                    child: Text(
-                      formattedTime,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.grey[800],
+                        ],
                       ),
                     ),
                   ),
-                );
-              }).toList(),
-            ],
-          ),
+          ],
         ),
       );
-    }
-
-    // Add definition section at the bottom
-    results.add(SizedBox(height: 6));
-    results.add(Divider(height: 1, thickness: 1, color: Colors.grey[400]));
-    results.add(SizedBox(height: 4));
-    
-    // Add pace type definitions
-    final definitions = [
-      {'label': 'E', 'name': 'Easy Pace', 'desc': '+15% slower (recovery runs)', 'color': Color.fromRGBO(76, 175, 80, 1)},
-      {'label': 'M', 'name': 'Marathon Pace', 'desc': 'Base pace (race pace)', 'color': Color.fromRGBO(243, 134, 32, 1)},
-      {'label': 'T', 'name': 'Threshold Pace', 'desc': '7% faster (tempo runs)', 'color': Color.fromRGBO(255, 152, 0, 1)},
-      {'label': 'I', 'name': 'Interval Pace', 'desc': '12% faster (speed work)', 'color': Color.fromRGBO(255, 87, 34, 1)},
-      {'label': 'R', 'name': 'Repetition Pace', 'desc': '17% faster (max effort)', 'color': Color.fromRGBO(244, 67, 54, 1)},
-    ];
-
-    for (var def in definitions) {
-      results.add(
-        Padding(
-          padding: EdgeInsets.symmetric(vertical: 1),
-          child: Row(
-            children: [
-              Container(
-                width: 18,
-                height: 18,
-                decoration: BoxDecoration(
-                  color: def['color'] as Color,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-                child: Center(
-                  child: Text(
-                    def['label'] as String,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-              SizedBox(width: 6),
-              Expanded(
-                child: RichText(
-                  text: TextSpan(
-                    style: TextStyle(fontSize: 11, color: Colors.grey[800]),
-                    children: [
-                      TextSpan(
-                        text: '${def['name']}: ',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      TextSpan(text: def['desc'] as String),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return results;
-  }
-
-  // New helper method for calculating time with a specific pace
-  double _calculateTimeForDistanceWithPace(
-      int distanceInMeters, double pacePerKm) {
-    final pacePerKmInSeconds = pacePerKm * 60;
-    final pacePerMeterInSeconds = pacePerKmInSeconds / 1000.0;
-    return distanceInMeters * pacePerMeterInSeconds;
-  }
-
-  // Keep old method for backward compatibility
-  double _calculateTimeForDistance(int distanceInMeters) {
-    return _calculateTimeForDistanceWithPace(distanceInMeters, _paceValue);
+    }).toList();
   }
 
   Widget _buildLapSlidePanel() {
-    return GestureDetector(
-      onHorizontalDragEnd: (details) {
-        // Swipe from right to left to close (negative velocity)
-        if (details.primaryVelocity != null && details.primaryVelocity! < -500) {
-          toggleLapSlidePanel();
-        }
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.2),
-              blurRadius: 8,
-              offset: Offset(2, 0),
-            ),
-          ],
-        ),
-        child: SafeArea(
-          child: Column(
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 8,
+            offset: Offset(2, 0),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: Column(
           children: [
             // Header - full width for full screen
             Container(
               padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: Color.fromRGBO(243, 134, 32, 1), // Orange color for LAP
+                color: Color.fromRGBO(76, 175, 80, 1), // Green color for LAP
                 borderRadius: BorderRadius.only(
                   bottomLeft: Radius.circular(12),
                   bottomRight: Radius.circular(12),
@@ -3575,7 +3492,6 @@ class _TimerListState extends State<TimerList>
               child: _buildLapContent(),
             ),
           ],
-          ),
         ),
       ),
     );
@@ -3642,7 +3558,7 @@ class _TimerListState extends State<TimerList>
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.bold,
-                color: Color.fromRGBO(243, 134, 32, 1),
+                color: Color.fromRGBO(76, 175, 80, 1),
               ),
             ),
             SizedBox(height: 4),
@@ -3674,7 +3590,7 @@ class _TimerListState extends State<TimerList>
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
-                  color: Color.fromRGBO(243, 134, 32, 1),
+                  color: Color.fromRGBO(76, 175, 80, 1),
                 ),
               ),
               Text(
@@ -3699,7 +3615,7 @@ class _TimerListState extends State<TimerList>
                     width: 24,
                     height: 24,
                     decoration: BoxDecoration(
-                      color: Color.fromRGBO(243, 134, 32, 1),
+                      color: Color.fromRGBO(76, 175, 80, 1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Center(
@@ -4220,8 +4136,8 @@ class _TimerListState extends State<TimerList>
           AnimatedBuilder(
             animation: _slideAnimation,
             builder: (context, child) {
-              // Full screen width for pace calculation panel
-              final double panelWidth = MediaQuery.of(context).size.width;
+              // Panel width set to 155px as requested
+              final double panelWidth = 155;
               final slideOffset =
                   -panelWidth + (_slideAnimation.value * panelWidth);
               return Transform.translate(
@@ -4256,11 +4172,11 @@ class _TimerListState extends State<TimerList>
           ),
           // PACE tab button - only shows when both drawers are closed
           AnimatedBuilder(
-            animation: Listenable.merge([_slideAnimation, _lapSlideAnimation]),
+            animation: _slideAnimation,
             builder: (context, child) {
               // Only show tab when both drawers are closed
-              bool bothClosed = _slideAnimation.value < 0.1 && _lapSlideAnimation.value < 0.1;
-              if (!bothClosed) return SizedBox.shrink();
+              if (_slideAnimation.value > 0.1 || _lapSlideAnimation.value > 0.1)
+                return SizedBox.shrink();
 
               return Positioned(
                 bottom: 60,
@@ -4271,11 +4187,7 @@ class _TimerListState extends State<TimerList>
                     width: 28, // Very small width for minimal tab appearance
                     height: 80, // Height that won't cover buttons
                     decoration: BoxDecoration(
-                      color: Colors.white,
-                      border: Border.all(
-                        color: Color.fromRGBO(243, 134, 32, 1),
-                        width: 2,
-                      ),
+                      color: Color.fromRGBO(243, 134, 32, 1),
                       borderRadius: BorderRadius.only(
                         topRight: Radius.circular(8),
                         bottomRight: Radius.circular(8),
@@ -4287,7 +4199,7 @@ class _TimerListState extends State<TimerList>
                         child: Text(
                           'PACE',
                           style: TextStyle(
-                            color: Color.fromRGBO(243, 134, 32, 1),
+                            color: Colors.white,
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
                           ),
@@ -4301,11 +4213,10 @@ class _TimerListState extends State<TimerList>
           ),
           // LAP tab button
           AnimatedBuilder(
-            animation: Listenable.merge([_slideAnimation, _lapSlideAnimation]),
+            animation: _lapSlideAnimation,
             builder: (context, child) {
-              // Only show tab when both drawers are closed
-              bool bothClosed = _slideAnimation.value < 0.1 && _lapSlideAnimation.value < 0.1;
-              if (!bothClosed) return SizedBox.shrink();
+              if (_slideAnimation.value > 0.1 || _lapSlideAnimation.value > 0.1)
+                return SizedBox.shrink();
 
               return Positioned(
                 bottom: 150,
@@ -4316,11 +4227,8 @@ class _TimerListState extends State<TimerList>
                     width: 28,
                     height: 80,
                     decoration: BoxDecoration(
-                      color: Colors.white,
-                      border: Border.all(
-                        color: Color.fromRGBO(243, 134, 32, 1),
-                        width: 2,
-                      ),
+                      color:
+                          Color.fromRGBO(76, 175, 80, 1), // Green color for LAP
                       borderRadius: BorderRadius.only(
                         topRight: Radius.circular(8),
                         bottomRight: Radius.circular(8),
@@ -4332,7 +4240,7 @@ class _TimerListState extends State<TimerList>
                         child: Text(
                           'LAPS',
                           style: TextStyle(
-                            color: Color.fromRGBO(243, 134, 32, 1),
+                            color: Colors.white,
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
                           ),
@@ -4977,7 +4885,7 @@ class LapTimesPage extends StatelessWidget {
   final List<LapEntry> lapEntries;
   final String runnerName;
 
-  const LapTimesPage({super.key, required this.lapEntries, required this.runnerName});
+  LapTimesPage({required this.lapEntries, required this.runnerName});
 
   @override
   Widget build(BuildContext context) {

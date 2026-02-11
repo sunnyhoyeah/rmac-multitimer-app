@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "829873993417",
+    "project_id": "multitimer-20cda",
+    "storage_bucket": "multitimer-20cda.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:829873993417:android:36794b36f71eae9dea3f18",
+        "android_client_info": {
+          "package_name": "com.example.multitimer_trackfield"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCE7tyU6ULTffH0ZtV70ZdPheP7GPhieto"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:829873993417:android:ec65d1487cab8768ea3f18",
+        "android_client_info": {
+          "package_name": "com.rmac.multitimer"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCE7tyU6ULTffH0ZtV70ZdPheP7GPhieto"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
